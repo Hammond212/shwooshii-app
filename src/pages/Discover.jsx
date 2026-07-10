@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllProjects, getAllProfiles, searchUsers } from '../lib/supabase'
+import { getAllProjects, getAllProfiles, searchUsers } from '../lib/supabase.js'
 
 const esc = (s) => String(s || '').replace(/[<>"'&]/g, c =>
   ({ '<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;' }[c]))
