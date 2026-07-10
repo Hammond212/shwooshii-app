@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { getProject, likeProject, unlikeProject, hasLiked, deleteProject } from '../lib/supabase'
+import { getProject, likeProject, unlikeProject, hasLiked, deleteProject } from '../lib/supabase.js'
 import { Heart, Github, ExternalLink, ArrowLeft, Trash2 } from 'lucide-react'
 
 export default function ProjectDetail({ user }) {
