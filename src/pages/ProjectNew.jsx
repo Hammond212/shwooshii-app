@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createProject } from '../lib/supabase'
+import { createProject } from '../lib/supabase.js'
 import { Plus, X, Rocket } from 'lucide-react'
 
 const Field = ({ label, hint, ...props }) => (
