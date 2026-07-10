@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getProfile, updateProfile, getAllSkills, getUserSkills, addSkill, removeSkill } from '../lib/supabase'
+import { getProfile, updateProfile, getAllSkills, getUserSkills, addSkill, removeSkill } from '../lib/supabase.js'
 import { Save, User, Link as LinkIcon, MapPin, Code } from 'lucide-react'
 
 const Section = ({ title, icon, children }) => (
