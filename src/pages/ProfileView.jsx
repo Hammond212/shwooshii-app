@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getProfileByUsername, getUserProjects, getUserSkills, getFollowerCount, isFollowing, follow, unfollow } from '../lib/supabase'
+import { getProfileByUsername, getUserProjects, getUserSkills, getFollowerCount, isFollowing, follow, unfollow } from '../lib/supabase.js'
 import { MapPin, Globe, Github, Linkedin, Twitter } from 'lucide-react'
 import ProjectCard from '../components/ProjectCard'
 
