@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getProfile, getUserProjects } from '../lib/supabase'
+import { getProfile, getUserProjects } from '../lib/supabase.js'
 import { Plus, Settings, Compass, Zap } from 'lucide-react'
-import ProjectCard from '../components/ProjectCard'
+import ProjectCard from '../components/ProjectCard.jsx'
 
 export default function Dashboard({ user }) {
   const [profile, setProfile] = useState(null)
