@@ -25,7 +25,6 @@ const tagColor = (tag) => TAG_COLORS[tag.charCodeAt(0) % TAG_COLORS.length]
 
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
-  @keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
   @keyframes cardIn { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
   @keyframes shimmer { from{background-position:200% 0} to{background-position:-200% 0} }
   @keyframes dotPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
@@ -34,22 +33,6 @@ const GLOBAL_CSS = `
   a { text-decoration:none; }
 `
 
-function Marquee() {
-  const items = ['DISCOVER','BUILD','SHIP','CONNECT','PROVE YOUR CRAFT','BOTSWANA & BEYOND','PROBLEM SOLVERS']
-  const track = [...items,...items,...items]
-  return (
-    <div style={{overflow:'hidden',borderBottom:'1px solid rgba(255,255,255,0.05)',padding:'12px 0',background:'rgba(255,107,53,0.03)'}}>
-      <div style={{display:'flex',gap:'3.5rem',width:'max-content',animation:'marquee 32s linear infinite'}}>
-        {track.map((item,i) => (
-          <span key={i} style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'.68rem',letterSpacing:'.22em',color:i%2===0?'#FF6B35':'rgba(255,255,255,0.18)',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'1.5rem'}}>
-            {item}
-            <span style={{color:'#00C9A7',fontSize:'.55rem'}}>◆</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function Skeleton({h=340}) {
   return <div style={{height:h,borderRadius:20,background:'linear-gradient(90deg,rgba(255,255,255,0.03) 25%,rgba(255,255,255,0.07) 50%,rgba(255,255,255,0.03) 75%)',backgroundSize:'200% 100%',animation:'shimmer 1.6s infinite'}}/>
@@ -185,7 +168,6 @@ export default function Discover({ user }) {
   return (
     <div style={{minHeight:'100vh',background:BG,color:'#fff'}}>
       <style>{GLOBAL_CSS}</style>
-      <Marquee/>
 
       <div style={{maxWidth:1160,margin:'0 auto',padding:'2.5rem 1.5rem'}}>
 
