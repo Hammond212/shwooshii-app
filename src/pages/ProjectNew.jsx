@@ -1,187 +1,265 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { createProject } from '../lib/supabase.js'
+import { C, BASE_CSS } from '../lib/theme.js'
 
-const ORANGE = '#FF6B35'
-const TEAL = '#00C9A7'
-const DARK = '#0A0A0F'
-const DARK2 = '#13131F'
-const BORDER = 'rgba(255,255,255,0.08)'
-const MUTED = 'rgba(255,255,255,0.35)'
-
-const TECH_OPTIONS = ['React','Vue','Next.js','Node.js','Python','TypeScript','Supabase',
-  'PostgreSQL','Tailwind CSS','MongoDB','Firebase','Docker','AWS','GraphQL','Flutter','React Native','Go','Rust']
-
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
-  * { box-sizing: border-box; }
-  input::placeholder,textarea::placeholder { color: rgba(255,255,255,0.22); font-family: 'Plus Jakarta Sans', sans-serif; }
-  textarea { resize: vertical; }
+const CSS = BASE_CSS + `
+.pn-wrap{max-width:680px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+.pn-back{
+  display:inline-flex;align-items:center;gap:.35rem;
+  color:${C.muted};font-size:.82rem;font-weight:600;
+  margin-bottom:1.5rem;transition:color .2s;
+}
+.pn-back:hover{color:${C.orange}}
+.pn-sec{
+  background:${C.white};border:1px solid ${C.border};
+  border-radius:18px;padding:1.75rem;margin-bottom:1.25rem;
+}
+.pn-sec-h{
+  font-size:.95rem;font-weight:800;color:${C.ink};
+  margin-bottom:1.25rem;padding-bottom:.85rem;
+  border-bottom:1px solid ${C.border};
+  display:flex;align-items:center;gap:.5rem;
+}
+.pn-sec-n{
+  width:22px;height:22px;border-radius:7px;
+  background:${C.orangeBg};color:${C.orange};
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:800;
+}
+.pn-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+.pn-custom{display:flex;gap:.5rem}
+.pn-custom input{flex:1}
+.pn-picked{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.85rem}
+.pn-tag{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.25rem .7rem;border-radius:100px;
+  background:${C.orangeBg};color:${C.orange};
+  border:1px solid rgba(255,107,53,0.25);
+  font-size:.75rem;font-weight:700;
+}
+.pn-tag button{
+  background:none;border:none;cursor:pointer;color:${C.orange};
+  padding:0;display:flex;align-items:center;font-size:.7rem;
+}
+.pn-submit{width:100%;padding:.95rem;font-size:.95rem}
 `
 
-const inp = {
-  width: '100%', padding: '.8rem 1rem',
-  background: 'rgba(255,255,255,0.04)',
-  border: `1px solid ${BORDER}`, borderRadius: 10,
-  color: '#fff', outline: 'none',
-  fontFamily: "'Plus Jakarta Sans', sans-serif",
-  fontSize: '.875rem', transition: 'border-color .2s, box-shadow .2s',
-}
-
-const onFocus = e => { e.target.style.borderColor = 'rgba(255,107,53,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(255,107,53,0.08)' }
-const onBlur  = e => { e.target.style.borderColor = BORDER; e.target.style.boxShadow = 'none' }
-
-const Label = ({ children }) => (
-  <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.5rem' }}>
-    {children}
-  </div>
-)
-
-const Section = ({ title, children }) => (
-  <div style={{ background: DARK2, border: `1px solid ${BORDER}`, borderRadius: 16, padding: '1.75rem', marginBottom: '1.25rem' }}>
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '.9rem', color: '#fff', marginBottom: '1.25rem', paddingBottom: '.875rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      {title}
-    </div>
-    {children}
-  </div>
-)
+const TECH = ['React','Vue','Next.js','Node.js','Python','TypeScript','Supabase',
+  'PostgreSQL','Tailwind CSS','MongoDB','Firebase','Docker','AWS','GraphQL',
+  'Flutter','React Native','Go','Rust']
 
 export default function ProjectNew({ user }) {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ title: '', description: '', problem_solved: '', github_url: '', live_url: '', image_url: '' })
-  const [technologies, setTechnologies] = useState([])
-  const [techInput, setTechInput] = useState('')
+  const [form, setForm] = useState({
+    title: '', problem_solved: '', description: '',
+    github_url: '', live_url: '', image_url: '',
+  })
+  const [techs, setTechs]   = useState([])
+  const [custom, setCustom] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]   = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const toggleTech = (t) => {
-    setTechnologies(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  const toggle = (t) =>
+    setTechs(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+
+  const addCustom = () => {
+    const t = custom.trim()
+    if (t && !techs.includes(t)) setTechs(prev => [...prev, t])
+    setCustom('')
   }
 
-  const addCustomTech = () => {
-    const t = techInput.trim()
-    if (t && !technologies.includes(t)) setTechnologies(prev => [...prev, t])
-    setTechInput('')
-  }
-
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    if (!form.title.trim()) { setError('Project title is required'); return }
+    if (!form.title.trim()) { setError('Give your project a title.'); return }
     setSaving(true)
     setError('')
     try {
-      const { data, error: err } = await createProject(user.id, { ...form, technologies })
+      const { data, error: err } = await createProject(user.id, {
+        ...form, technologies: techs,
+      })
       if (err) throw err
-      // Navigate to dashboard after success
-      if (data && data[0] && data[0].id) {
-        navigate(`/project/${data[0].id}`)
-      } else {
-        navigate('/home')
-      }
+      navigate(data?.[0]?.id ? `/project/${data[0].id}` : '/home')
     } catch (err) {
-      setError(err.message || 'Failed to create project')
+      setError(err.message || 'Could not publish. Try again.')
       setSaving(false)
     }
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: DARK, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <style>{css}</style>
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '3rem 1.5rem' }}>
+    <div className="page">
+      <style>{CSS}</style>
+      <div className="pn-wrap">
 
-        {/* Header */}
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ fontSize: '.7rem', fontWeight: 700, color: ORANGE, letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-            <span style={{ width: 16, height: 1, background: ORANGE, display: 'inline-block' }}/>
-            Projects
-          </div>
-          <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '2rem', fontWeight: 900, letterSpacing: '-.03em', margin: '0 0 .5rem 0' }}>Share a project</h1>
-          <p style={{ color: MUTED, fontSize: '.875rem', margin: 0 }}>Show the community what you built — and the problem you solved.</p>
-        </div>
+        <Link to="/home" className="pn-back">← Back</Link>
 
-        {/* Error */}
+        <header style={{ marginBottom: '2rem' }} className="rise">
+          <div className="eyebrow">New project</div>
+          <h1 className="h1" style={{ marginBottom: '.5rem' }}>Share what you built</h1>
+          <p className="sub">
+            The problem you solved matters more than the tech you used. Lead with that.
+          </p>
+        </header>
+
         {error && (
-          <div style={{ background: 'rgba(255,95,162,0.08)', border: '1px solid rgba(255,95,162,0.2)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', color: '#FF5FA2', fontSize: '.82rem' }}>
-            ⚠ {error}
+          <div className="alert alert-err" role="alert">
+            <span aria-hidden="true">⚠</span>
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          {/* Project basics */}
-          <Section title="Project details">
-            <div style={{ marginBottom: '1rem' }}>
-              <Label>Project title *</Label>
-              <input style={inp} placeholder="e.g. Student Marketplace" value={form.title} onChange={e => set('title', e.target.value)} onFocus={onFocus} onBlur={onBlur} required />
+        <form onSubmit={submit}>
+          {/* 1. Details */}
+          <section className="pn-sec rise" style={{ animationDelay: '.05s' }}>
+            <div className="pn-sec-h">
+              <span className="pn-sec-n">1</span> Project details
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <Label>Problem solved</Label>
-              <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.25)', marginBottom: '.4rem' }}>What real-world problem does this solve? Most important field.</div>
-              <textarea style={{ ...inp, minHeight: 90 }} placeholder="e.g. Students had no safe way to buy/sell items on campus..." value={form.problem_solved} onChange={e => set('problem_solved', e.target.value)} onFocus={onFocus} onBlur={onBlur} />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <textarea style={{ ...inp, minHeight: 80 }} placeholder="A short overview of what you built..." value={form.description} onChange={e => set('description', e.target.value)} onFocus={onFocus} onBlur={onBlur} />
-            </div>
-          </Section>
 
-          {/* Tech stack */}
-          <Section title="Tech stack">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem', marginBottom: '1rem' }}>
-              {TECH_OPTIONS.map(t => (
-                <button key={t} type="button" onClick={() => toggleTech(t)} style={{
-                  padding: '.28rem .8rem', borderRadius: 100,
-                  border: technologies.includes(t) ? '1px solid rgba(255,107,53,0.5)' : `1px solid ${BORDER}`,
-                  background: technologies.includes(t) ? 'rgba(255,107,53,0.12)' : 'transparent',
-                  color: technologies.includes(t) ? ORANGE : MUTED,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-                }}>
-                  {technologies.includes(t) ? '✓ ' : ''}{t}
+            <div className="fld">
+              <label htmlFor="pn-title">Project title *</label>
+              <input
+                id="pn-title"
+                value={form.title}
+                onChange={e => set('title', e.target.value)}
+                placeholder="Uniplace"
+                required
+              />
+            </div>
+
+            <div className="fld">
+              <label htmlFor="pn-prob">Problem solved</label>
+              <textarea
+                id="pn-prob"
+                value={form.problem_solved}
+                onChange={e => set('problem_solved', e.target.value)}
+                placeholder="Students in Botswana had no safe way to buy and sell on campus…"
+              />
+              <div className="hint">
+                This is the most important field. What was broken before you built this?
+              </div>
+            </div>
+
+            <div className="fld" style={{ marginBottom: 0 }}>
+              <label htmlFor="pn-desc">Description</label>
+              <textarea
+                id="pn-desc"
+                value={form.description}
+                onChange={e => set('description', e.target.value)}
+                placeholder="A short overview of what you built and how it works…"
+                style={{ minHeight: 76 }}
+              />
+            </div>
+          </section>
+
+          {/* 2. Stack */}
+          <section className="pn-sec rise" style={{ animationDelay: '.1s' }}>
+            <div className="pn-sec-h">
+              <span className="pn-sec-n">2</span> Tech stack
+            </div>
+
+            <div className="pn-chips">
+              {TECH.map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`chip ${techs.includes(t) ? 'on' : ''}`}
+                  onClick={() => toggle(t)}
+                  aria-pressed={techs.includes(t)}
+                >
+                  {techs.includes(t) ? '✓ ' : ''}{t}
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '.5rem' }}>
-              <input style={{ ...inp, flex: 1 }} placeholder="Add custom tech..." value={techInput}
-                onChange={e => setTechInput(e.target.value)}
-                onFocus={onFocus} onBlur={onBlur}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTech() } }} />
-              <button type="button" onClick={addCustomTech} style={{ padding: '.8rem 1.25rem', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.25)', color: ORANGE, borderRadius: 10, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>Add</button>
+
+            <div className="pn-custom">
+              <input
+                value={custom}
+                onChange={e => setCustom(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); addCustom() }
+                }}
+                placeholder="Something else? Add it…"
+                aria-label="Add custom technology"
+                style={{
+                  padding: '.8rem 1rem',
+                  border: `1.5px solid ${C.border}`,
+                  borderRadius: 10,
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  fontSize: '.9rem',
+                  outline: 'none',
+                }}
+              />
+              <button type="button" onClick={addCustom} className="btn btn-teal btn-sm">
+                Add
+              </button>
             </div>
-            {technologies.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginTop: '.75rem' }}>
-                {technologies.map(t => (
-                  <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', padding: '.22rem .7rem', borderRadius: 100, background: 'rgba(255,107,53,0.12)', color: ORANGE, border: '1px solid rgba(255,107,53,0.25)', fontSize: '.72rem', fontWeight: 600 }}>
+
+            {techs.length > 0 && (
+              <div className="pn-picked">
+                {techs.map(t => (
+                  <span key={t} className="pn-tag">
                     {t}
-                    <button type="button" onClick={() => setTechnologies(prev => prev.filter(x => x !== t))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: ORANGE, padding: 0, fontSize: '.7rem', lineHeight: 1, display: 'flex', alignItems: 'center' }}>✕</button>
+                    <button
+                      type="button"
+                      onClick={() => setTechs(prev => prev.filter(x => x !== t))}
+                      aria-label={`Remove ${t}`}
+                    >✕</button>
                   </span>
                 ))}
               </div>
             )}
-          </Section>
+          </section>
 
-          {/* Links */}
-          <Section title="Links & media">
-            <div style={{ marginBottom: '1rem' }}>
-              <Label>GitHub repo</Label>
-              <input style={inp} placeholder="https://github.com/..." value={form.github_url} onChange={e => set('github_url', e.target.value)} onFocus={onFocus} onBlur={onBlur} />
+          {/* 3. Links */}
+          <section className="pn-sec rise" style={{ animationDelay: '.15s' }}>
+            <div className="pn-sec-h">
+              <span className="pn-sec-n">3</span> Links &amp; media
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <Label>Live URL</Label>
-              <input style={inp} placeholder="https://..." value={form.live_url} onChange={e => set('live_url', e.target.value)} onFocus={onFocus} onBlur={onBlur} />
-            </div>
-            <div>
-              <Label>Cover image URL</Label>
-              <input style={inp} placeholder="https://... (Cloudinary, Imgur, etc.)" value={form.image_url} onChange={e => set('image_url', e.target.value)} onFocus={onFocus} onBlur={onBlur} />
-            </div>
-          </Section>
 
-          {/* Submit */}
-          <button type="submit" disabled={saving} style={{ width: '100%', padding: '1rem', background: `linear-gradient(135deg, ${ORANGE}, #FF8C5A)`, color: '#fff', border: 'none', borderRadius: 12, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: '1rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? .7 : 1, boxShadow: '0 0 24px rgba(255,107,53,0.3)', letterSpacing: '.02em', transition: 'all .2s' }}
-            onMouseEnter={e => { if (!saving) e.currentTarget.style.boxShadow = '0 0 36px rgba(255,107,53,0.5)' }}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 24px rgba(255,107,53,0.3)'}>
-            {saving ? 'Publishing...' : '↑ Publish project'}
+            <div className="fld">
+              <label htmlFor="pn-live">Live URL</label>
+              <input
+                id="pn-live"
+                type="url"
+                value={form.live_url}
+                onChange={e => set('live_url', e.target.value)}
+                placeholder="https://uniplace.co.bw"
+              />
+              <div className="hint">A working link is the strongest proof you can give.</div>
+            </div>
+
+            <div className="fld">
+              <label htmlFor="pn-gh">GitHub repo</label>
+              <input
+                id="pn-gh"
+                type="url"
+                value={form.github_url}
+                onChange={e => set('github_url', e.target.value)}
+                placeholder="https://github.com/you/project"
+              />
+            </div>
+
+            <div className="fld" style={{ marginBottom: 0 }}>
+              <label htmlFor="pn-img">Cover image URL</label>
+              <input
+                id="pn-img"
+                type="url"
+                value={form.image_url}
+                onChange={e => set('image_url', e.target.value)}
+                placeholder="https://…"
+              />
+              <div className="hint">Optional. A screenshot works well.</div>
+            </div>
+          </section>
+
+          <button
+            type="submit"
+            className="btn btn-primary pn-submit"
+            disabled={saving}
+          >
+            {saving ? 'Publishing…' : 'Publish project →'}
           </button>
         </form>
       </div>
