@@ -1,193 +1,292 @@
 import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { getProfileByUsername, getUserProjects, getUserSkills, getFollowerCount, isFollowing, follow, unfollow } from '../lib/supabase.js'
-import { MapPin, Globe, Github, Linkedin, Twitter } from 'lucide-react'
+import { useParams, Link } from 'react-router-dom'
+import {
+  getProfileByUsername, getUserProjects, getUserSkills,
+  getFollowerCount, isFollowing, follow, unfollow,
+} from '../lib/supabase.js'
+import { C, BASE_CSS, initials } from '../lib/theme.js'
 import ProjectCard from '../components/ProjectCard.jsx'
+
+const CSS = BASE_CSS + `
+.pv-wrap{max-width:900px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+.pv-card{
+  background:${C.bg};border:1px solid ${C.border};
+  border-radius:22px;padding:2rem;margin-bottom:1.75rem;
+  position:relative;overflow:hidden;
+}
+.pv-blob{
+  position:absolute;top:-120px;right:-100px;
+  width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(255,107,53,0.12) 0%,transparent 65%);
+  pointer-events:none;
+}
+.pv-top{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:1.25rem;flex-wrap:wrap;position:relative;z-index:1;
+}
+.pv-id{display:flex;align-items:center;gap:1.25rem}
+.pv-av{width:76px;height:76px;font-size:1.3rem;box-shadow:0 6px 22px rgba(255,107,53,0.3)}
+.pv-name{font-size:1.7rem;font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:.35rem}
+.pv-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.pv-handle{font-size:.85rem;color:${C.muted};font-weight:500}
+
+.pv-stats{
+  display:flex;gap:1.75rem;flex-wrap:wrap;
+  margin-top:1.5rem;padding-top:1.5rem;
+  border-top:1px solid ${C.border};
+  position:relative;z-index:1;
+}
+.pv-stat{display:flex;align-items:baseline;gap:.35rem}
+.pv-stat-n{font-size:1.15rem;font-weight:800;letter-spacing:-.02em}
+.pv-stat-l{font-size:.78rem;color:${C.muted}}
+
+.pv-bio{
+  color:${C.ink2};font-size:.92rem;line-height:1.75;
+  margin-top:1.1rem;max-width:620px;position:relative;z-index:1;
+}
+.pv-links{
+  display:flex;gap:1.1rem;flex-wrap:wrap;margin-top:1.1rem;
+  position:relative;z-index:1;
+}
+.pv-link{font-size:.82rem;font-weight:700;color:${C.muted};transition:color .2s}
+.pv-link:hover{color:${C.orange}}
+
+.pv-sec{
+  background:${C.white};border:1px solid ${C.border};
+  border-radius:18px;padding:1.6rem;margin-bottom:1.75rem;
+}
+.pv-skills{display:flex;flex-wrap:wrap;gap:.45rem}
+`
+
+const CAT_PILL = {
+  frontend: 'pill-o', backend: 'pill-t', design: 'pill-p',
+  devops:   'pill-l', database: 'pill-y', tools: 'pill-g',
+}
 
 export default function ProfileView({ user }) {
   const { username } = useParams()
-  const [profile, setProfile] = useState(null)
-  const [projects, setProjects] = useState([])
-  const [skills, setSkills] = useState([])
-  const [followers, setFollowers] = useState(0)
-  const [following, setFollowingState] = useState(false)
-  const [loading, setLoading] = useState(true)
 
-  const isOwn = profile?.user_id === user.id
+  const [profile, setProfile]     = useState(null)
+  const [projects, setProjects]   = useState([])
+  const [skills, setSkills]       = useState([])
+  const [followers, setFollowers] = useState(0)
+  const [following, setFollowing] = useState(false)
+  const [loading, setLoading]     = useState(true)
+  const [busy, setBusy]           = useState(false)
+
+  const own = profile?.user_id === user.id
 
   useEffect(() => {
-    loadAll()
-  }, [username])
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      const { data: p } = await getProfileByUsername(username)
+      if (!alive) return
+      if (!p) { setProfile(null); setLoading(false); return }
 
-  const loadAll = async () => {
-    const { data: p } = await getProfileByUsername(username)
-    if (!p) { setLoading(false); return }
-    setProfile(p)
-    const [pr, sk, fc, fol] = await Promise.all([
-      getUserProjects(p.user_id),
-      getUserSkills(p.user_id),
-      getFollowerCount(p.user_id),
-      isFollowing(user.id, p.user_id),
-    ])
-    setProjects(pr.data || [])
-    setSkills(sk.data || [])
-    setFollowers(fc)
-    setFollowingState(fol)
-    setLoading(false)
-  }
+      setProfile(p)
+      const [pr, sk, fc, fol] = await Promise.all([
+        getUserProjects(p.user_id),
+        getUserSkills(p.user_id),
+        getFollowerCount(p.user_id),
+        isFollowing(user.id, p.user_id),
+      ])
+      if (!alive) return
+      setProjects(pr.data || [])
+      setSkills(sk.data || [])
+      setFollowers(fc || 0)
+      setFollowing(fol)
+      setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [username, user.id])
 
-  const handleFollow = async () => {
-    if (following) {
-      await unfollow(user.id, profile.user_id)
-      setFollowingState(false)
-      setFollowers(f => f - 1)
-    } else {
-      await follow(user.id, profile.user_id)
-      setFollowingState(true)
-      setFollowers(f => f + 1)
+  const toggleFollow = async () => {
+    if (busy || !profile) return
+    setBusy(true)
+    const next = !following
+    setFollowing(next)
+    setFollowers(n => n + (next ? 1 : -1))
+    try {
+      next
+        ? await follow(user.id, profile.user_id)
+        : await unfollow(user.id, profile.user_id)
+    } catch {
+      setFollowing(!next)
+      setFollowers(n => n + (next ? -1 : 1))
+    } finally {
+      setBusy(false)
     }
   }
 
-  if (loading) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',color:'#6B7280' }}>Loading...</div>
-  if (!profile) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',color:'#6B7280' }}>Profile not found</div>
-
-  const initials = (profile.full_name || profile.username || 'U')
-    .split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)
-
-  const categoryColor = {
-    frontend:'#A78BFA', backend:'#22D3EE', design:'#F472B6',
-    devops:'#34D399', database:'#FBBF24', tools:'#9CA3AF',
+  if (loading) {
+    return (
+      <div className="page">
+        <style>{CSS}</style>
+        <div className="pv-wrap">
+          <div className="skel" style={{ height: 220, marginBottom: '1.75rem' }} />
+          <div className="grid grid-3">
+            {[0,1,2].map(i => <div key={i} className="skel" style={{ height: 320 }} />)}
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  return (
-    <div style={{ maxWidth:900, margin:'0 auto', padding:'3rem 2rem' }}>
-      {/* Profile header */}
-      <div style={{
-        background:'#08080F', border:'1px solid rgba(139,92,246,0.15)',
-        borderRadius:16, padding:'2rem', marginBottom:'2rem',
-        position:'relative', overflow:'hidden',
-      }}>
-        {/* Glow bg */}
-        <div style={{
-          position:'absolute', top:0, right:0, width:300, height:300,
-          background:'radial-gradient(ellipse,rgba(139,92,246,0.06),transparent 70%)',
-          pointerEvents:'none',
-        }}/>
+  if (!profile) {
+    return (
+      <div className="page">
+        <style>{CSS}</style>
+        <div className="pv-wrap">
+          <div className="empty">
+            <div className="empty-icon">?</div>
+            <h3 className="h3" style={{ marginBottom: '.5rem' }}>Profile not found</h3>
+            <p className="dim" style={{ marginBottom: '1.5rem' }}>
+              No builder with the handle @{username}.
+            </p>
+            <Link to="/discover" className="btn btn-primary">Find builders →</Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem', flexWrap:'wrap' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'1.5rem' }}>
-            <div className="avatar" style={{ width:72, height:72, fontSize:'1.2rem', flexShrink:0 }}>
-              {profile.avatar_url
-                ? <img src={profile.avatar_url} alt="" style={{ width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover' }}/>
-                : initials}
-            </div>
-            <div>
-              <div style={{ display:'flex', alignItems:'center', gap:'.75rem', marginBottom:'.3rem', flexWrap:'wrap' }}>
-                <h1 style={{ fontFamily:'Orbitron,sans-serif', fontSize:'1.3rem', fontWeight:700, color:'#fff' }}>
-                  {profile.full_name || profile.username}
-                </h1>
-                {profile.is_verified && <span className="badge badge-cyan">✓ Verified</span>}
-                {profile.trust_score > 0 && (
-                  <span style={{ fontFamily:'Orbitron,sans-serif', fontSize:'.72rem', color:'#22D3EE' }}>
-                    {profile.trust_score} pts
-                  </span>
-                )}
+  const name = profile.full_name || profile.username
+
+  return (
+    <div className="page">
+      <style>{CSS}</style>
+      <div className="pv-wrap">
+
+        {/* Profile card */}
+        <section className="pv-card rise">
+          <div className="pv-blob" aria-hidden="true" />
+
+          <div className="pv-top">
+            <div className="pv-id">
+              <div className="av pv-av">
+                {profile.avatar_url
+                  ? <img src={profile.avatar_url} alt="" />
+                  : initials(name)}
               </div>
-              <div style={{ color:'#6B7280', fontSize:'.85rem', marginBottom:'.5rem' }}>@{profile.username}</div>
-              {profile.role && <span className="badge badge-purple">{profile.role}</span>}
+              <div>
+                <h1 className="pv-name">{name}</h1>
+                <div className="pv-meta">
+                  <span className="pv-handle">@{profile.username}</span>
+                  {profile.role && <span className="pill pill-o">{profile.role}</span>}
+                  {profile.is_verified && <span className="pill pill-t">✓ Verified</span>}
+                </div>
+              </div>
             </div>
+
+            {own ? (
+              <Link to="/settings" className="btn btn-ghost">Edit profile</Link>
+            ) : (
+              <button
+                onClick={toggleFollow}
+                className={`btn ${following ? 'btn-ghost' : 'btn-primary'}`}
+                aria-pressed={following}
+              >
+                {following ? 'Following' : 'Follow'}
+              </button>
+            )}
           </div>
 
-          {!isOwn && (
-            <button onClick={handleFollow} className={`btn ${following ? 'btn-ghost' : 'btn-outline'}`}
-              style={{ fontSize:'.85rem', padding:'.6rem 1.5rem' }}>
-              {following ? 'Following' : 'Follow'}
-            </button>
-          )}
-        </div>
-
-        {/* Stats row */}
-        <div style={{ display:'flex', gap:'2rem', marginTop:'1.5rem', paddingTop:'1.5rem', borderTop:'1px solid rgba(255,255,255,0.05)', flexWrap:'wrap' }}>
-          {[
-            { label:'Projects', value:projects.length, color:'#A78BFA' },
-            { label:'Followers', value:followers, color:'#22D3EE' },
-          ].map(s => (
-            <div key={s.label}>
-              <span style={{ fontFamily:'Orbitron,sans-serif', fontSize:'1.1rem', fontWeight:700, color:s.color }}>{s.value}</span>
-              <span style={{ color:'#6B7280', fontSize:'.8rem', marginLeft:'.4rem' }}>{s.label}</span>
+          <div className="pv-stats">
+            <div className="pv-stat">
+              <span className="pv-stat-n" style={{ color: C.orange }}>{projects.length}</span>
+              <span className="pv-stat-l">projects</span>
             </div>
-          ))}
-          {profile.location && (
-            <div style={{ display:'flex', alignItems:'center', gap:'.35rem', color:'#6B7280', fontSize:'.82rem' }}>
-              <MapPin size={13}/>{profile.location}
+            <div className="pv-stat">
+              <span className="pv-stat-n" style={{ color: C.teal }}>{followers}</span>
+              <span className="pv-stat-l">followers</span>
+            </div>
+            {profile.trust_score > 0 && (
+              <div className="pv-stat">
+                <span className="pv-stat-n" style={{ color: C.lavender }}>{profile.trust_score}</span>
+                <span className="pv-stat-l">trust score</span>
+              </div>
+            )}
+            {profile.location && (
+              <div className="pv-stat">
+                <span className="pv-stat-l">◎ {profile.location}</span>
+              </div>
+            )}
+          </div>
+
+          {profile.bio && <p className="pv-bio">{profile.bio}</p>}
+
+          {(profile.github_url || profile.linkedin_url || profile.website_url || profile.twitter_url) && (
+            <div className="pv-links">
+              {profile.github_url && (
+                <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="pv-link">
+                  GitHub ↗
+                </a>
+              )}
+              {profile.linkedin_url && (
+                <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="pv-link">
+                  LinkedIn ↗
+                </a>
+              )}
+              {profile.website_url && (
+                <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="pv-link">
+                  Website ↗
+                </a>
+              )}
+              {profile.twitter_url && (
+                <a href={profile.twitter_url} target="_blank" rel="noopener noreferrer" className="pv-link">
+                  Twitter ↗
+                </a>
+              )}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Bio */}
-        {profile.bio && (
-          <p style={{ color:'#9CA3AF', fontSize:'.9rem', lineHeight:1.7, marginTop:'1rem', maxWidth:600 }}>{profile.bio}</p>
+        {/* Skills */}
+        {skills.length > 0 && (
+          <section className="pv-sec rise" style={{ animationDelay: '.06s' }}>
+            <div className="eyebrow teal">Skills</div>
+            <div className="pv-skills">
+              {skills.map(s => (
+                <span
+                  key={s.id}
+                  className={`pill ${CAT_PILL[s.skills?.category] || 'pill-g'}`}
+                  style={{ padding: '.35rem .9rem', fontSize: '.8rem' }}
+                >
+                  {s.skills?.name}
+                </span>
+              ))}
+            </div>
+          </section>
         )}
 
-        {/* Links */}
-        <div style={{ display:'flex', gap:'1rem', marginTop:'1rem', flexWrap:'wrap' }}>
-          {profile.github_url && (
-            <a href={profile.github_url} target="_blank" rel="noopener noreferrer"
-              style={{ display:'flex', alignItems:'center', gap:'.35rem', color:'#9CA3AF', fontSize:'.82rem', textDecoration:'none' }}>
-              <Github size={14}/> GitHub
-            </a>
-          )}
-          {profile.linkedin_url && (
-            <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer"
-              style={{ display:'flex', alignItems:'center', gap:'.35rem', color:'#A78BFA', fontSize:'.82rem', textDecoration:'none' }}>
-              <Linkedin size={14}/> LinkedIn
-            </a>
-          )}
-          {profile.website_url && (
-            <a href={profile.website_url} target="_blank" rel="noopener noreferrer"
-              style={{ display:'flex', alignItems:'center', gap:'.35rem', color:'#22D3EE', fontSize:'.82rem', textDecoration:'none' }}>
-              <Globe size={14}/> Website
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Skills */}
-      {skills.length > 0 && (
-        <div style={{
-          background:'#08080F', border:'1px solid rgba(139,92,246,0.12)',
-          borderRadius:14, padding:'1.5rem', marginBottom:'2rem',
-        }}>
-          <div className="s-label" style={{ marginBottom:'1rem' }}>Skills</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'.5rem' }}>
-            {skills.map(s => (
-              <span key={s.id} style={{
-                padding:'.3rem .85rem', borderRadius:100,
-                fontSize:'.75rem', fontWeight:500,
-                background:`rgba(139,92,246,0.1)`,
-                color: categoryColor[s.skills?.category] || '#A78BFA',
-                border:`1px solid rgba(139,92,246,0.15)`,
-              }}>
-                {s.skills?.name}
-              </span>
-            ))}
+        {/* Projects */}
+        <section className="rise" style={{ animationDelay: '.1s' }}>
+          <div className="eyebrow" style={{ marginBottom: '1.4rem' }}>
+            Projects ({projects.length})
           </div>
-        </div>
-      )}
 
-      {/* Projects */}
-      <div className="s-label" style={{ marginBottom:'1.5rem' }}>
-        Projects ({projects.length})
+          {projects.length === 0 ? (
+            <div className="empty">
+              <div className="empty-icon">◎</div>
+              <h3 className="h3" style={{ marginBottom: '.5rem' }}>
+                {own ? 'You haven\u2019t shared a project yet' : 'No projects yet'}
+              </h3>
+              {own && (
+                <Link to="/project/new" className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                  Share your first project →
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-3">
+              {projects.map((p, i) => (
+                <ProjectCard key={p.id} project={p} index={i} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
-      {projects.length === 0 ? (
-        <div style={{ textAlign:'center', padding:'3rem', color:'#6B7280', fontSize:'.9rem' }}>
-          No projects shared yet.
-        </div>
-      ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'1.25rem' }}>
-          {projects.map(p => <ProjectCard key={p.id} project={p}/>)}
-        </div>
-      )}
     </div>
   )
 }
