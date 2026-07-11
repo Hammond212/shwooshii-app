@@ -1,25 +1,62 @@
 import React, { useEffect, useState } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { supabase, getUser } from './lib/supabase.js'
-import Nav from './components/Nav'
-import Auth from './pages/Auth'
-import Dashboard from './pages/Dashboard'
-import Discover from './pages/Discover'
-import ProfileView from './pages/ProfileView'
-import ProfileEdit from './pages/ProfileEdit'
-import ProjectNew from './pages/ProjectNew'
-import ProjectDetail from './pages/ProjectDetail'
+import Nav from './components/Nav.jsx'
+import Landing from './pages/Landing.jsx'
+import Auth from './pages/Auth.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Discover from './pages/Discover.jsx'
+import ProfileView from './pages/ProfileView.jsx'
+import ProfileEdit from './pages/ProfileEdit.jsx'
+import ProjectNew from './pages/ProjectNew.jsx'
+import ProjectDetail from './pages/ProjectDetail.jsx'
+
+// Routes where the app nav bar should be hidden
+const NO_NAV = ['/', '/auth']
+
+function Shell({ user, setUser }) {
+  const location = useLocation()
+  const showNav = user && !NO_NAV.includes(location.pathname)
+
+  return (
+    <>
+      {showNav && <Nav user={user} onLogout={() => setUser(null)} />}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Routes>
+          {/* Public — always available */}
+          <Route path="/" element={<Landing />} />
+          <Route
+            path="/auth"
+            element={user ? <Navigate to="/home" replace /> : <Auth onAuth={() => getUser().then(setUser)} />}
+          />
+
+          {/* Protected */}
+          {user ? (
+            <>
+              <Route path="/home" element={<Dashboard user={user} />} />
+              <Route path="/discover" element={<Discover user={user} />} />
+              <Route path="/profile/:username" element={<ProfileView user={user} />} />
+              <Route path="/settings" element={<ProfileEdit user={user} />} />
+              <Route path="/project/new" element={<ProjectNew user={user} />} />
+              <Route path="/project/:id" element={<ProjectDetail user={user} />} />
+              <Route path="*" element={<Navigate to="/home" replace />} />
+            </>
+          ) : (
+            <Route path="*" element={<Navigate to="/auth" replace />} />
+          )}
+        </Routes>
+      </div>
+    </>
+  )
+}
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
     getUser().then(u => { setUser(u); setLoading(false) })
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -27,17 +64,23 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#050508' }}>
-        <div style={{ textAlign:'center' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', background: '#0A0A0F',
+      }}>
+        <div style={{ textAlign: 'center' }}>
           <div style={{
-            width:48, height:48, borderRadius:'50%',
-            border:'2px solid rgba(139,92,246,0.2)',
-            borderTop:'2px solid #8B5CF6',
-            animation:'spin 1s linear infinite',
-            margin:'0 auto 1rem'
+            width: 44, height: 44, borderRadius: '50%',
+            border: '2px solid rgba(255,107,53,0.15)',
+            borderTop: '2px solid #FF6B35',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem',
           }} />
-          <p style={{ color:'#6B7280', fontSize:'.85rem', fontFamily:'Space Grotesk,sans-serif' }}>Loading...</p>
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          <p style={{
+            color: 'rgba(255,255,255,0.3)', fontSize: '.8rem',
+            fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '.1em',
+          }}>LOADING</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </div>
       </div>
     )
@@ -45,27 +88,7 @@ export default function App() {
 
   return (
     <Router>
-      {user && <Nav user={user} onLogout={() => setUser(null)} />}
-      <div style={{ position:'relative', zIndex:1 }}>
-        <Routes>
-          {!user ? (
-            <>
-              <Route path="/" element={<Auth onAuth={() => getUser().then(setUser)} />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </>
-          ) : (
-            <>
-              <Route path="/" element={<Dashboard user={user} />} />
-              <Route path="/discover" element={<Discover user={user} />} />
-              <Route path="/profile/:username" element={<ProfileView user={user} />} />
-              <Route path="/settings" element={<ProfileEdit user={user} />} />
-              <Route path="/project/new" element={<ProjectNew user={user} />} />
-              <Route path="/project/:id" element={<ProjectDetail user={user} />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </>
-          )}
-        </Routes>
-      </div>
+      <Shell user={user} setUser={setUser} />
     </Router>
   )
 }
