@@ -1,138 +1,169 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getProfile, getUserProjects } from '../lib/supabase.js'
-import { Plus, Settings, Compass, Zap } from 'lucide-react'
+import { getProfile, getUserProjects, getFollowerCount } from '../lib/supabase.js'
+import { C, FONT, BASE_CSS, initials } from '../lib/theme.js'
 import ProjectCard from '../components/ProjectCard.jsx'
 
+const CSS = BASE_CSS + `
+.dash-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:1.5rem;flex-wrap:wrap;margin-bottom:2.5rem;
+}
+.dash-who{display:flex;align-items:center;gap:1.25rem}
+.dash-av{width:66px;height:66px;font-size:1.15rem;box-shadow:0 6px 20px rgba(255,107,53,0.3)}
+.dash-name{font-size:1.75rem;font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:.35rem}
+.dash-meta{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.dash-handle{font-size:.85rem;color:${C.muted};font-weight:500}
+.dash-acts{display:flex;gap:.6rem;flex-wrap:wrap}
+
+.dash-bio{
+  background:${C.bg};border:1px solid ${C.border};border-radius:14px;
+  padding:1.1rem 1.35rem;margin-bottom:2rem;
+  color:${C.ink2};font-size:.9rem;line-height:1.7;
+}
+
+.sec-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:1rem;margin-bottom:1.4rem;flex-wrap:wrap;
+}
+.sec-link{
+  font-size:.82rem;font-weight:700;color:${C.orange};
+  display:flex;align-items:center;gap:.3rem;transition:gap .2s;
+}
+.sec-link:hover{gap:.5rem}
+`
+
 export default function Dashboard({ user }) {
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile]   = useState(null)
   const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [followers, setFollowers] = useState(0)
+  const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
-    Promise.all([getProfile(user.id), getUserProjects(user.id)]).then(([p, pr]) => {
+    let alive = true
+    Promise.all([
+      getProfile(user.id),
+      getUserProjects(user.id),
+      getFollowerCount(user.id),
+    ]).then(([p, pr, fc]) => {
+      if (!alive) return
       if (p.data) setProfile(p.data)
       if (pr.data) setProjects(pr.data)
+      setFollowers(fc || 0)
       setLoading(false)
     })
+    return () => { alive = false }
   }, [user])
 
   if (loading) {
     return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'80vh' }}>
-        <div style={{ color:'#6B7280', fontFamily:'Space Grotesk,sans-serif' }}>Loading...</div>
+      <div className="page">
+        <style>{CSS}</style>
+        <div className="wrap">
+          <div className="skel" style={{ height: 90, marginBottom: '2.5rem' }} />
+          <div className="grid grid-stats" style={{ marginBottom: '2.5rem' }}>
+            {[0,1,2].map(i => <div key={i} className="skel" style={{ height: 96 }} />)}
+          </div>
+          <div className="grid grid-3">
+            {[0,1,2].map(i => <div key={i} className="skel" style={{ height: 320 }} />)}
+          </div>
+        </div>
       </div>
     )
   }
 
-  const initials = (profile?.full_name || profile?.username || 'U')
-    .split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)
+  const name = profile?.full_name || profile?.username || 'Builder'
 
   return (
-    <div style={{ maxWidth:1100, margin:'0 auto', padding:'3rem 2rem' }}>
+    <div className="page">
+      <style>{CSS}</style>
+      <div className="wrap">
 
-      {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'3rem', flexWrap:'wrap', gap:'1rem' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'1.25rem' }}>
-          <div className="avatar" style={{ width:64, height:64, fontSize:'1.1rem', letterSpacing:'.05em' }}>
-            {profile?.avatar_url
-              ? <img src={profile.avatar_url} alt="" style={{ width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover' }}/>
-              : initials
-            }
-          </div>
-          <div>
-            <h1 style={{ fontFamily:'Orbitron,sans-serif', fontSize:'1.4rem', fontWeight:700, color:'#fff', marginBottom:'.25rem' }}>
-              {profile?.full_name || profile?.username || 'Builder'}
-            </h1>
-            <div style={{ display:'flex', alignItems:'center', gap:'.75rem', flexWrap:'wrap' }}>
-              {profile?.username && <span style={{ color:'#6B7280', fontSize:'.82rem' }}>@{profile.username}</span>}
-              {profile?.role && (
-                <span className="badge badge-purple">{profile.role}</span>
-              )}
-              {profile?.is_verified && <span className="badge badge-cyan">✓ Verified</span>}
+        {/* Header */}
+        <header className="dash-head rise">
+          <div className="dash-who">
+            <div className="av dash-av">
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="" />
+                : initials(name)}
+            </div>
+            <div>
+              <h1 className="dash-name">{name}</h1>
+              <div className="dash-meta">
+                {profile?.username && (
+                  <span className="dash-handle">@{profile.username}</span>
+                )}
+                {profile?.role && (
+                  <span className="pill pill-o">{profile.role}</span>
+                )}
+                {profile?.is_verified && (
+                  <span className="pill pill-t">✓ Verified</span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div style={{ display:'flex', gap:'.75rem', flexWrap:'wrap' }}>
-          <Link to="/project/new" className="btn btn-primary" style={{ fontSize:'.85rem', padding:'.6rem 1.25rem' }}>
-            <Plus size={15}/> New project
-          </Link>
-          <Link to="/settings" className="btn btn-ghost" style={{ fontSize:'.85rem', padding:'.6rem 1.25rem' }}>
-            <Settings size={15}/> Edit profile
-          </Link>
-        </div>
-      </div>
 
-      {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem', marginBottom:'3rem' }}>
-        {[
-          { label:'Projects', value: projects.length, color:'#A78BFA' },
-          { label:'Trust score', value: profile?.trust_score || 0, color:'#22D3EE' },
-          { label:'Connections', value: 0, color:'#F472B6' },
-        ].map(s => (
-          <div key={s.label} style={{
-            background:'rgba(8,8,15,0.8)', border:'1px solid rgba(139,92,246,0.12)',
-            borderRadius:12, padding:'1.25rem 1.5rem',
-          }}>
-            <div style={{ fontFamily:'Orbitron,sans-serif', fontSize:'1.75rem', fontWeight:700, color:s.color, marginBottom:'.25rem' }}>
-              {s.value}
-            </div>
-            <div style={{ fontSize:'.72rem', color:'#6B7280', letterSpacing:'.08em', textTransform:'uppercase' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Bio */}
-      {profile?.bio && (
-        <div style={{
-          background:'rgba(8,8,15,0.8)', border:'1px solid rgba(139,92,246,0.1)',
-          borderRadius:12, padding:'1.25rem 1.5rem', marginBottom:'2.5rem',
-          color:'#9CA3AF', fontSize:'.9rem', lineHeight:1.7,
-        }}>
-          {profile.bio}
-        </div>
-      )}
-
-      {/* Projects section */}
-      <div>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.5rem' }}>
-          <div>
-            <div className="s-label">Your projects</div>
-          </div>
-          <Link to="/discover" style={{
-            display:'flex', alignItems:'center', gap:'.35rem',
-            color:'#A78BFA', fontSize:'.82rem', textDecoration:'none', fontWeight:500,
-          }}>
-            <Compass size={14}/> Browse discover
-          </Link>
-        </div>
-
-        {projects.length === 0 ? (
-          <div style={{
-            background:'rgba(8,8,15,0.6)', border:'1px dashed rgba(139,92,246,0.2)',
-            borderRadius:14, padding:'4rem 2rem', textAlign:'center',
-          }}>
-            <div style={{
-              width:56, height:56, borderRadius:14,
-              background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              margin:'0 auto 1.25rem',
-            }}>
-              <Zap size={24} color="#A78BFA"/>
-            </div>
-            <h3 style={{ fontFamily:'Space Grotesk,sans-serif', fontWeight:600, marginBottom:'.5rem' }}>No projects yet</h3>
-            <p style={{ color:'#6B7280', fontSize:'.875rem', marginBottom:'1.5rem' }}>
-              Showcase your first project and start building your reputation.
-            </p>
-            <Link to="/project/new" className="btn btn-primary" style={{ fontSize:'.85rem' }}>
-              <Plus size={15}/> Add first project
+          <div className="dash-acts">
+            <Link to="/project/new" className="btn btn-primary">
+              + New project
+            </Link>
+            <Link to="/settings" className="btn btn-ghost">
+              Edit profile
             </Link>
           </div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:'1.25rem' }}>
-            {projects.map(p => <ProjectCard key={p.id} project={p}/>)}
+        </header>
+
+        {/* Stats */}
+        <div className="grid grid-stats rise" style={{ marginBottom: '2rem', animationDelay: '.08s' }}>
+          <div className="stat">
+            <div className="stat-n" style={{ color: C.orange }}>{projects.length}</div>
+            <div className="stat-l">Projects</div>
+          </div>
+          <div className="stat">
+            <div className="stat-n" style={{ color: C.teal }}>{profile?.trust_score || 0}</div>
+            <div className="stat-l">Trust score</div>
+          </div>
+          <div className="stat">
+            <div className="stat-n" style={{ color: C.lavender }}>{followers}</div>
+            <div className="stat-l">Followers</div>
+          </div>
+        </div>
+
+        {/* Bio */}
+        {profile?.bio && (
+          <div className="dash-bio rise" style={{ animationDelay: '.12s' }}>
+            {profile.bio}
           </div>
         )}
+
+        {/* Projects */}
+        <section className="rise" style={{ animationDelay: '.16s' }}>
+          <div className="sec-head">
+            <div className="eyebrow">Your projects</div>
+            <Link to="/discover" className="sec-link">
+              Browse discover →
+            </Link>
+          </div>
+
+          {projects.length === 0 ? (
+            <div className="empty">
+              <div className="empty-icon">↑</div>
+              <h3 className="h3" style={{ marginBottom: '.5rem' }}>No projects yet</h3>
+              <p className="dim" style={{ marginBottom: '1.5rem', maxWidth: 360, margin: '0 auto 1.5rem' }}>
+                Share your first project and start proving what you can build.
+              </p>
+              <Link to="/project/new" className="btn btn-primary">
+                Share your first project →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-3">
+              {projects.map((p, i) => (
+                <ProjectCard key={p.id} project={p} index={i} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )
