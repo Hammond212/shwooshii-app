@@ -52,17 +52,34 @@ export const getAllProfiles = (limit = 20) =>
 export const createProject = (userId, data) =>
   supabase.from('projects').insert([{ user_id: userId, ...data }]).select()
 
-export const getProject = (id) =>
-  supabase.from('projects').select('*, profiles(username, avatar_url, full_name)').eq('id', id).single()
+export const getProject = async (id) => {
+  const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()
+  if (error || !data) return { data: null, error }
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('username, avatar_url, full_name')
+    .eq('user_id', data.user_id)
+    .maybeSingle()
+  return { data: { ...data, profiles: prof || null }, error: null }
+}
 
 export const getUserProjects = (userId) =>
   supabase.from('projects').select('*').eq('user_id', userId).order('created_at', { ascending: false })
 
-export const getAllProjects = (limit = 24) =>
-  supabase.from('projects')
-    .select('*, profiles(username, avatar_url)')
+export const getAllProjects = async (limit = 24) => {
+  const { data, error } = await supabase.from('projects')
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
+  if (error || !data) return { data: [], error }
+  const ids = [...new Set(data.map(p => p.user_id))]
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('user_id, username, avatar_url, full_name')
+    .in('user_id', ids)
+  const map = Object.fromEntries((profs || []).map(p => [p.user_id, p]))
+  return { data: data.map(p => ({ ...p, profiles: map[p.user_id] || null })), error: null }
+}
 
 export const updateProject = (id, data) =>
   supabase.from('projects').update({ ...data, updated_at: new Date() }).eq('id', id).select()
