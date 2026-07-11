@@ -582,6 +582,31 @@ body.dark .mock-proj{background:#1E1E32}
   animation:accentPing 2s cubic-bezier(0,0,.2,1) infinite;
   pointer-events:none;
 }
+
+
+/* ─── NAV AUTH BUTTONS ─── */
+.nav-auth{display:flex;align-items:center;gap:.75rem}
+.nav-signin{
+  padding:.5rem 1.1rem;color:var(--ink2);
+  font-weight:600;font-size:.85rem;border-radius:100px;
+  border:1px solid transparent;transition:all .2s;
+}
+.nav-signin:hover{color:var(--orange);background:var(--orange-bg)}
+
+/* ─── WORD ROTATOR (BUILD / SHIP / CONNECT) ─── */
+.word-rotator{
+  position:relative;display:inline-block;
+  min-width:78px;height:1em;vertical-align:middle;
+  text-align:left;
+}
+.word-slide{
+  position:absolute;left:0;top:0;
+  opacity:0;transform:translateY(8px);
+  transition:opacity .45s ease, transform .45s ease;
+  white-space:nowrap;
+}
+.word-slide.active{opacity:1;transform:translateY(0)}
+.word-slide.exit{opacity:0;transform:translateY(-8px)}
 `
 
 const LANDING_HTML = `
@@ -606,7 +631,10 @@ const LANDING_HTML = `
     <a href="#community">Community</a>
     <a href="#how">How it works</a>
   </div>
-  <a href="#cta" class="nav-cta" data-nav="/auth">Get started</a>
+  <div class="nav-auth">
+    <a href="#" class="nav-signin" data-nav="/auth">Sign in</a>
+    <a href="#" class="nav-cta" data-nav="/auth?mode=signup">Sign up</a>
+  </div>
 </nav>
 
 <!-- HERO -->
@@ -620,7 +648,9 @@ const LANDING_HTML = `
     <div class="hero-left">
       <div class="hero-tag">
   <canvas id="heart-canvas" width="32" height="28"></canvas>
-  <span>Developer community &nbsp;·&nbsp; Botswana &amp; beyond</span>
+  <span class="word-rotator" id="word-rotator" aria-live="polite">
+    <span class="word-slide active">BUILD</span>
+  </span>
 </div>
       <h1>
         Where builders<br>
@@ -628,8 +658,8 @@ const LANDING_HTML = `
       </h1>
       <p class="hero-sub">Shwooshii is the creative hub for developers, founders, and problem-solvers. Showcase real projects, post startup ideas, and connect with people who actually build.</p>
       <div class="hero-actions">
-        <a href="#cta" class="btn-orange" data-nav="/auth">Get early access →<span class="accent-ring"></span></a>
-        <a href="#what" class="btn-line">See how it works</a>
+        <a href="#" class="btn-orange" data-nav="/auth?mode=signup">Create your profile →<span class="accent-ring"></span></a>
+        <a href="#" class="btn-line" data-nav="/auth">Sign in</a>
       </div>
       <div class="hero-stats">
         <div class="hstat-box">
@@ -770,7 +800,7 @@ const LANDING_HTML = `
   </div>
 </section>
 
-<!-- HORIZONTAL SCROLL — Tech stack marquee -->
+<!-- HORIZONTAL SCROLL — Tech stack -->
 <section class="h-scroll-wrap" style="padding:3rem 0;background:var(--bg);border-top:1px solid var(--border);overflow:hidden">
   <div style="max-width:1140px;margin:0 auto;padding:0 5%;margin-bottom:1.5rem">
     <div class="eyebrow ey-o reveal">Built with</div>
@@ -795,8 +825,8 @@ const LANDING_HTML = `
     <h2>Ready to build<br>in public?</h2>
     <p>Shwooshii is launching soon. Join the waitlist and be first to create your verified developer portfolio — free, forever.</p>
     <div class="cta-actions">
-      <a href="#cta" class="btn-orange" data-nav="/auth">Create your profile →<span class="accent-ring"></span></a>
-      <a href="#features" class="btn-line">Explore features</a>
+      <a href="#" class="btn-orange" data-nav="/auth?mode=signup">Sign up free →<span class="accent-ring"></span></a>
+      <a href="#" class="btn-line" data-nav="/auth">Sign in</a>
     </div>
   </div>
 </section>
@@ -1108,42 +1138,6 @@ document.querySelectorAll('.tilt').forEach(card => {
   card.addEventListener('mouseenter', () => { card.style.transition = 'none'; });
 });
 
-// ── 7. CONFETTI ON CTA CLICK ──────────────────────────────────
-const CONFETTI_COLORS = ['#FF6B35','#FF5FA2','#7C6FEA','#00C9A7','#FFD166','#FF2D55'];
-function fireConfetti(originX, originY){
-  for(let i = 0; i < 60; i++){
-    const p = document.createElement('div');
-    p.className = 'confetti-piece';
-    p.style.cssText = \`
-      left:\${originX}px; top:\${originY}px;
-      background:\${CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)]};
-      border-radius:\${Math.random()>.5?'50%':'2px'};
-      width:\${6+Math.random()*6}px;height:\${6+Math.random()*6}px;
-    \`;
-    document.body.appendChild(p);
-    const angle = Math.random() * Math.PI * 2;
-    const velocity = 4 + Math.random() * 10;
-    const vx = Math.cos(angle) * velocity;
-    const vy = Math.sin(angle) * velocity - 8;
-    let x = 0, y = 0, vy2 = vy, alpha = 1;
-    const tick = () => {
-      x += vx; y += vy2; vy2 += 0.4; alpha -= 0.018;
-      p.style.transform = \`translate(\${x}px,\${y}px) rotate(\${x*3}deg)\`;
-      p.style.opacity = alpha;
-      if(alpha > 0) requestAnimationFrame(tick);
-      else p.remove();
-    };
-    requestAnimationFrame(tick);
-  }
-}
-document.querySelectorAll('.btn-orange').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.preventDefault();
-    fireConfetti(e.clientX, e.clientY);
-    if (btn.dataset.nav) { setTimeout(() => { window.__shwooshiiNav(btn.dataset.nav); }, 450); }
-  });
-});
-
 // ── 8. PIXEL DISTORTION on hover (canvas glitch) ──────────────
 document.querySelectorAll('.distort').forEach(el => {
   el.addEventListener('mouseenter', () => {
@@ -1275,12 +1269,47 @@ document.querySelectorAll('[data-nav]').forEach(el => {
     e.preventDefault();
     const path = el.dataset.nav;
     if (typeof window.__shwooshiiNav === 'function') {
-      // If it's a btn-orange, confetti already fires; give it a beat
-      const delay = el.classList.contains('btn-orange') ? 450 : 0;
-      setTimeout(() => window.__shwooshiiNav(path), delay);
+      window.__shwooshiiNav(path);
     }
   });
 });
+
+
+// \u2500\u2500 WORD SLIDESHOW: BUILD / SHIP / CONNECT \u2500\u2500
+(function(){
+  const el = document.getElementById('word-rotator');
+  if (!el) return;
+  const words = ['BUILD', 'SHIP', 'CONNECT'];
+  let i = 0;
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.innerHTML = '<span class="word-slide active">BUILD \u00b7 SHIP \u00b7 CONNECT</span>';
+    return;
+  }
+
+  function show(idx){
+    const current = el.querySelector('.word-slide');
+    if (current) {
+      current.classList.remove('active');
+      current.classList.add('exit');
+      setTimeout(() => current.remove(), 450);
+    }
+    const next = document.createElement('span');
+    next.className = 'word-slide';
+    next.textContent = words[idx];
+    el.appendChild(next);
+    // force reflow so the transition fires
+    void next.offsetWidth;
+    next.classList.add('active');
+  }
+
+  // Kick off after the first word has been visible a beat
+  setTimeout(function cycle(){
+    i = (i + 1) % words.length;
+    show(i);
+    setTimeout(cycle, 2200);
+  }, 2200);
+})();
 `
 
 export default function Landing() {
