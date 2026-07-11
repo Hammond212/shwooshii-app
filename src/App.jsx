@@ -66,21 +66,24 @@ export default function App() {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', background: '#0A0A0F',
+        minHeight: '100vh', background: '#FFFFFF',
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
-            width: 44, height: 44, borderRadius: '50%',
-            border: '2px solid rgba(255,107,53,0.15)',
-            borderTop: '2px solid #FF6B35',
-            animation: 'spin 1s linear infinite',
+            width: 42, height: 42, borderRadius: '50%',
+            border: '3px solid #FFF1EC',
+            borderTop: '3px solid #FF6B35',
+            animation: 'spin .9s linear infinite',
             margin: '0 auto 1rem',
           }} />
           <p style={{
-            color: 'rgba(255,255,255,0.3)', fontSize: '.8rem',
-            fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '.1em',
+            color: '#8888A8', fontSize: '.78rem', fontWeight: 600,
+            fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '.12em',
           }}>LOADING</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+            @keyframes spin { to { transform: rotate(360deg) } }
+          `}</style>
         </div>
       </div>
     )
