@@ -1,116 +1,182 @@
-import React from 'react'
+import React, { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Heart, Github, ExternalLink, Eye } from 'lucide-react'
+import { C, FONT, tagClass, initials, timeSince } from '../lib/theme.js'
 
-export default function ProjectCard({ project }) {
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+.pc{
+  display:flex;flex-direction:column;height:100%;
+  background:${C.white};border:1px solid ${C.border};
+  border-radius:18px;overflow:hidden;cursor:pointer;
+  font-family:${FONT};
+  will-change:transform;
+}
+.pc-media{
+  height:150px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,${C.orangeBg},${C.tealBg});
+  display:flex;align-items:center;justify-content:center;
+  border-bottom:1px solid ${C.border};
+}
+.pc-media img{width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.23,1,.32,1)}
+.pc:hover .pc-media img{transform:scale(1.06)}
+.pc-glyph{
+  font-size:2.6rem;font-weight:800;letter-spacing:-.04em;
+  background:linear-gradient(135deg,${C.orange},${C.teal});
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  opacity:.35;
+}
+.pc-live{
+  position:absolute;top:10px;right:10px;
+  display:flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,0.95);
+  border:1px solid rgba(0,201,167,0.35);
+  border-radius:100px;padding:3px 10px;
+  font-size:.62rem;font-weight:800;color:${C.tealDark};letter-spacing:.08em;
+}
+.pc-dot{width:5px;height:5px;border-radius:50%;background:${C.teal};animation:pcPulse 2s infinite}
+@keyframes pcPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+.pc-body{padding:1.15rem 1.25rem;display:flex;flex-direction:column;flex:1}
+.pc-who{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
+.pc-av{width:26px;height:26px;font-size:.55rem}
+.pc-handle{font-size:.75rem;color:${C.muted};font-weight:500}
+.pc-time{margin-left:auto;font-size:.68rem;color:${C.muted}}
+
+.pc-title{font-size:1rem;font-weight:800;color:${C.ink};letter-spacing:-.02em;
+  line-height:1.3;margin-bottom:.6rem}
+
+.pc-prob{
+  border-left:3px solid ${C.teal};
+  background:${C.tealBg};
+  border-radius:0 8px 8px 0;
+  padding:.55rem .75rem;margin-bottom:.75rem;
+}
+.pc-prob-l{font-size:.62rem;font-weight:800;color:${C.tealDark};
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem}
+.pc-prob-t{font-size:.78rem;color:${C.ink2};line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.pc-desc{font-size:.82rem;color:${C.muted};line-height:1.6;margin-bottom:.75rem;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.pc-tags{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.9rem}
+.pc-more{font-size:.68rem;color:${C.muted};align-self:center}
+
+.pc-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-top:.75rem;margin-top:auto;
+  border-top:1px solid ${C.border};
+}
+.pc-links{display:flex;gap:.75rem}
+.pc-link{font-size:.75rem;font-weight:600;color:${C.muted};transition:color .2s}
+.pc-link:hover{color:${C.ink}}
+.pc-link.live{color:${C.tealDark}}
+.pc-likes{display:flex;align-items:center;gap:.25rem;font-size:.75rem;
+  font-weight:700;color:${C.pink}}
+`
+
+export default function ProjectCard({ project, index = 0 }) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  const [hov, setHov]   = useState(false)
+  const ref = useRef(null)
+
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    setTilt({
+      x: ((e.clientX - r.left) / r.width - .5) * 8,
+      y: ((e.clientY - r.top) / r.height - .5) * -8,
+    })
+  }
+
+  const reset = () => { setTilt({ x: 0, y: 0 }); setHov(false) }
+
+  const techs  = (project.technologies || []).slice(0, 3)
+  const extra  = Math.max(0, (project.technologies?.length || 0) - 3)
+  const uname  = project.profiles?.username || 'builder'
+  const fname  = project.profiles?.full_name || uname
+  const avatar = project.profiles?.avatar_url
+
   return (
-    <Link to={`/project/${project.id}`} style={{ textDecoration:'none' }}>
-      <div style={{
-        background: '#08080F',
-        border: '1px solid rgba(139,92,246,0.12)',
-        borderRadius: 14,
-        overflow: 'hidden',
-        transition: 'border-color .2s, transform .2s',
-        cursor: 'pointer',
-        height: '100%',
-        display: 'flex', flexDirection: 'column',
-      }}
-        onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'rgba(139,92,246,0.35)'
-          e.currentTarget.style.transform = 'translateY(-3px)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.borderColor = 'rgba(139,92,246,0.12)'
-          e.currentTarget.style.transform = 'translateY(0)'
+    <Link to={`/project/${project.id}`} aria-label={`View project: ${project.title}`}>
+      <style>{CSS}</style>
+      <article
+        ref={ref}
+        className="pc rise"
+        onMouseMove={onMove}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={reset}
+        style={{
+          transform: `perspective(900px) rotateX(${tilt.y}deg) rotateY(${tilt.x}deg) translateY(${hov ? -4 : 0}px)`,
+          boxShadow: hov ? C.shadowLg : 'none',
+          borderColor: hov ? 'transparent' : C.border,
+          transition: hov
+            ? 'box-shadow .25s, border-color .25s'
+            : 'all .5s cubic-bezier(.23,1,.32,1)',
+          animationDelay: `${index * 0.05}s`,
         }}
       >
-        {/* Image */}
-        {project.image_url ? (
-          <div style={{ width:'100%', height:160, overflow:'hidden', background:'#0D0D1A' }}>
-            <img src={project.image_url} alt={project.title}
-              style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-          </div>
-        ) : (
-          <div style={{
-            width:'100%', height:120,
-            background: 'linear-gradient(135deg,rgba(139,92,246,0.08),rgba(6,182,212,0.05))',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            borderBottom: '1px solid rgba(139,92,246,0.08)',
-          }}>
-            <span style={{
-              fontFamily:'Orbitron,sans-serif', fontSize:'2rem', fontWeight:900,
-              background:'linear-gradient(135deg,rgba(139,92,246,0.3),rgba(6,182,212,0.3))',
-              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
-            }}>{project.title?.[0]?.toUpperCase()}</span>
-          </div>
-        )}
+        {/* Media */}
+        <div className="pc-media">
+          {project.image_url
+            ? <img src={project.image_url} alt="" loading="lazy"
+                onError={e => { e.currentTarget.style.display = 'none' }} />
+            : <span className="pc-glyph">{(project.title || '?')[0].toUpperCase()}</span>
+          }
+          {project.live_url && (
+            <div className="pc-live"><span className="pc-dot" />LIVE</div>
+          )}
+        </div>
 
-        {/* Content */}
-        <div style={{ padding:'1.25rem', flex:1, display:'flex', flexDirection:'column' }}>
-          <h3 style={{
-            fontFamily:'Space Grotesk,sans-serif', fontWeight:700,
-            fontSize:'.95rem', color:'#fff', marginBottom:'.5rem',
-          }}>{project.title}</h3>
-
-          {project.problem_solved && (
-            <div style={{
-              background:'rgba(6,182,212,0.06)',
-              border:'1px solid rgba(6,182,212,0.12)',
-              borderRadius:6, padding:'.5rem .75rem', marginBottom:'.75rem',
-            }}>
-              <p style={{ fontSize:'.72rem', color:'#22D3EE', fontWeight:600, marginBottom:'.15rem' }}>Problem solved</p>
-              <p style={{ fontSize:'.78rem', color:'#9CA3AF', lineHeight:1.5,
-                overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
-                {project.problem_solved}
-              </p>
+        {/* Body */}
+        <div className="pc-body">
+          <div className="pc-who">
+            <div className="av pc-av">
+              {avatar ? <img src={avatar} alt="" /> : initials(fname)}
             </div>
-          )}
+            <span className="pc-handle">@{uname}</span>
+            <span className="pc-time">{timeSince(project.created_at)}</span>
+          </div>
 
-          {!project.problem_solved && project.description && (
-            <p style={{ fontSize:'.82rem', color:'#6B7280', lineHeight:1.6, marginBottom:'.75rem',
-              overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', flex:1 }}>
-              {project.description}
-            </p>
-          )}
+          <h3 className="pc-title">{project.title}</h3>
 
-          {/* Tech tags */}
-          {project.technologies?.length > 0 && (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:'.35rem', marginBottom:'.75rem', marginTop:'auto' }}>
-              {project.technologies.slice(0,3).map((t,i) => (
-                <span key={i} style={{
-                  padding:'.15rem .55rem', borderRadius:4, fontSize:'.68rem', fontWeight:500,
-                  background:'rgba(139,92,246,0.1)', color:'#A78BFA',
-                  border:'1px solid rgba(139,92,246,0.15)',
-                }}>{t}</span>
+          {project.problem_solved ? (
+            <div className="pc-prob">
+              <div className="pc-prob-l">Problem solved</div>
+              <p className="pc-prob-t">{project.problem_solved}</p>
+            </div>
+          ) : project.description ? (
+            <p className="pc-desc">{project.description}</p>
+          ) : null}
+
+          {techs.length > 0 && (
+            <div className="pc-tags">
+              {techs.map(t => (
+                <span key={t} className={`pill ${tagClass(t)}`}>{t}</span>
               ))}
-              {project.technologies.length > 3 && (
-                <span style={{ fontSize:'.68rem', color:'#6B7280' }}>+{project.technologies.length-3}</span>
-              )}
+              {extra > 0 && <span className="pc-more">+{extra}</span>}
             </div>
           )}
 
-          {/* Footer */}
-          <div style={{
-            display:'flex', alignItems:'center', justifyContent:'space-between',
-            paddingTop:'.75rem', borderTop:'1px solid rgba(255,255,255,0.05)',
-            marginTop:'.5rem',
-          }}>
-            <div style={{ display:'flex', gap:'.75rem' }}>
+          <div className="pc-foot">
+            <div className="pc-links">
               {project.github_url && (
-                <span style={{ color:'#6B7280' }}><Github size={14}/></span>
+                <a href={project.github_url} target="_blank" rel="noopener noreferrer"
+                  className="pc-link" onClick={e => e.stopPropagation()}>
+                  Code ↗
+                </a>
               )}
               {project.live_url && (
-                <span style={{ color:'#6B7280' }}><ExternalLink size={14}/></span>
+                <a href={project.live_url} target="_blank" rel="noopener noreferrer"
+                  className="pc-link live" onClick={e => e.stopPropagation()}>
+                  Live ↗
+                </a>
               )}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:'.35rem',
-              color:'#EC4899', fontSize:'.75rem', fontWeight:600 }}>
-              <Heart size={13}/>
-              {project.likes_count || 0}
-            </div>
+            <span className="pc-likes">♥ {project.likes_count || 0}</span>
           </div>
         </div>
-      </div>
+      </article>
     </Link>
   )
 }
