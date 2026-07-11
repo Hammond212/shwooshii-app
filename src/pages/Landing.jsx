@@ -612,11 +612,6 @@ body.dark .mock-proj{background:#1E1E32}
 const LANDING_HTML = `
 
 <!-- Scroll progress bar (Periodic) -->
-<div id="loader">
-  <div class="loader-logo">Shwooshii</div>
-  <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
-  <div class="loader-text">Loading your builder hub...</div>
-</div>
 <div id="progress-bar"></div>
 
 <!-- NAV -->
@@ -1186,13 +1181,7 @@ if(quote){
 }
 
 // ── PAGE LOADER HIDE ────────────────────────────────────────
-(function(){
-  const loader = document.getElementById('loader');
-  if(!loader) return;
-  const hideLoader = () => { loader.style.opacity='0'; loader.style.visibility='hidden'; loader.style.pointerEvents='none'; };
-  if(document.readyState === 'complete') { setTimeout(hideLoader, 1800); }
-  else { window.addEventListener('load', () => setTimeout(hideLoader, 1800)); }
-})();
+// Loader removed — SPA has nothing to wait for.
 
 // ── GSAP + SCROLLTRIGGER SETUP ──────────────────────────────
 (function(){
@@ -1262,17 +1251,7 @@ if(quote){
   }
 })();
 
-
-// \u2500\u2500 UNIVERSAL NAV HANDLER (added for React integration) \u2500\u2500
-document.querySelectorAll('[data-nav]').forEach(el => {
-  el.addEventListener('click', e => {
-    e.preventDefault();
-    const path = el.dataset.nav;
-    if (typeof window.__shwooshiiNav === 'function') {
-      window.__shwooshiiNav(path);
-    }
-  });
-});
+// Nav clicks are bound in React (see Landing.jsx useEffect).
 
 
 // \u2500\u2500 WORD SLIDESHOW: BUILD / SHIP / CONNECT \u2500\u2500
@@ -1314,32 +1293,55 @@ document.querySelectorAll('[data-nav]').forEach(el => {
 
 export default function Landing() {
   const navigate = useNavigate()
-  const mounted = useRef(false)
+  const rootRef = useRef(null)
+  const injected = useRef(false)
 
+  // ── Navigation: bind in React, not in the injected script ──
+  // (Injected scripts can race the paint; React refs cannot.)
   useEffect(() => {
-    // Expose navigation to the injected vanilla script
-    window.__shwooshiiNav = (path) => navigate(path)
+    const root = rootRef.current
+    if (!root) return
 
-    if (mounted.current) return
-    mounted.current = true
+    const onNavClick = (e) => {
+      const el = e.target.closest('[data-nav]')
+      if (!el || !root.contains(el)) return
+      e.preventDefault()
+      navigate(el.dataset.nav)
+    }
 
-    // Inject the landing script once the DOM is painted
-    const s = document.createElement('script')
-    s.id = 'shwooshii-landing-script'
-    s.textContent = LANDING_JS
-    document.body.appendChild(s)
+    root.addEventListener('click', onNavClick)
+    return () => root.removeEventListener('click', onNavClick)
+  }, [navigate])
+
+  // ── Inject the vanilla landing script AFTER first paint ──
+  useEffect(() => {
+    if (injected.current) return
+    injected.current = true
+
+    let raf1, raf2
+
+    // Double rAF guarantees the browser has painted the innerHTML
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const tag = document.createElement('script')
+        tag.id = 'shwooshii-landing-script'
+        tag.textContent = LANDING_JS
+        document.body.appendChild(tag)
+      })
+    })
 
     return () => {
+      cancelAnimationFrame(raf1)
+      cancelAnimationFrame(raf2)
       const old = document.getElementById('shwooshii-landing-script')
       if (old) old.remove()
-      delete window.__shwooshiiNav
     }
-  }, [navigate])
+  }, [])
 
   return (
     <>
       <style>{LANDING_CSS}</style>
-      <div dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />
+      <div ref={rootRef} dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />
     </>
   )
 }
