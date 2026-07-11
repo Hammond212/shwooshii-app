@@ -1,186 +1,256 @@
 import React, { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { getProject, likeProject, unlikeProject, hasLiked, deleteProject } from '../lib/supabase.js'
-import { Heart, Github, ExternalLink, ArrowLeft, Trash2 } from 'lucide-react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import {
+  getProject, likeProject, unlikeProject, hasLiked, deleteProject,
+} from '../lib/supabase.js'
+import { C, BASE_CSS, tagClass, initials, timeSince } from '../lib/theme.js'
+
+const CSS = BASE_CSS + `
+.pd-wrap{max-width:760px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+.pd-back{
+  display:inline-flex;align-items:center;gap:.35rem;
+  color:${C.muted};font-size:.82rem;font-weight:600;
+  margin-bottom:1.5rem;transition:color .2s;
+}
+.pd-back:hover{color:${C.orange}}
+
+.pd-cover{
+  width:100%;height:300px;border-radius:20px;overflow:hidden;
+  margin-bottom:1.75rem;background:linear-gradient(135deg,${C.orangeBg},${C.tealBg});
+  border:1px solid ${C.border};
+  display:flex;align-items:center;justify-content:center;
+}
+.pd-cover img{width:100%;height:100%;object-fit:cover}
+.pd-glyph{
+  font-size:5rem;font-weight:800;letter-spacing:-.04em;
+  background:linear-gradient(135deg,${C.orange},${C.teal});
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  opacity:.4;
+}
+
+.pd-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:1.25rem;flex-wrap:wrap;margin-bottom:1.75rem;
+}
+.pd-title{font-size:2rem;font-weight:800;letter-spacing:-.03em;
+  line-height:1.15;margin-bottom:.65rem}
+.pd-by{display:flex;align-items:center;gap:.5rem;color:${C.muted};font-size:.85rem}
+.pd-by-av{width:26px;height:26px;font-size:.55rem}
+.pd-acts{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+
+.pd-like{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.6rem 1.2rem;border-radius:100px;cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.85rem;
+  background:${C.white};border:1.5px solid ${C.border};color:${C.muted};
+  transition:all .2s;
+}
+.pd-like:hover{border-color:${C.pink};color:${C.pink}}
+.pd-like.on{background:${C.pinkBg};border-color:${C.pink};color:${C.pink}}
+
+.pd-hero{
+  background:linear-gradient(135deg,${C.tealBg},${C.orangeBg});
+  border:1px solid rgba(0,201,167,0.25);
+  border-radius:18px;padding:1.75rem;margin-bottom:1.25rem;
+}
+.pd-hero-l{
+  font-size:.7rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:${C.tealDark};margin-bottom:.7rem;
+  display:flex;align-items:center;gap:.5rem;
+}
+.pd-hero-l::before{content:'';width:18px;height:2px;background:${C.teal};border-radius:1px}
+.pd-hero-t{font-size:1.05rem;color:${C.ink};line-height:1.7;font-weight:500}
+
+.pd-sec{
+  background:${C.white};border:1px solid ${C.border};
+  border-radius:18px;padding:1.75rem;margin-bottom:1.25rem;
+}
+.pd-sec-h{font-size:.7rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:${C.orange};margin-bottom:.9rem;display:flex;align-items:center;gap:.5rem}
+.pd-sec-h::before{content:'';width:18px;height:2px;background:${C.orange};border-radius:1px}
+.pd-sec-t{color:${C.ink2};line-height:1.8;font-size:.95rem}
+.pd-tags{display:flex;flex-wrap:wrap;gap:.45rem}
+`
 
 export default function ProjectDetail({ user }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [project, setProject] = useState(null)
-  const [liked, setLiked] = useState(false)
-  const [likes, setLikes] = useState(0)
-  const [loading, setLoading] = useState(true)
 
-  const isOwner = project?.user_id === user.id
+  const [project, setProject] = useState(null)
+  const [liked, setLiked]     = useState(false)
+  const [likes, setLikes]     = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy]       = useState(false)
+
+  const owner = project && project.user_id === user.id
 
   useEffect(() => {
-    loadProject()
-  }, [id])
+    let alive = true
+    ;(async () => {
+      const { data } = await getProject(id)
+      if (!alive) return
+      if (data) {
+        setProject(data)
+        setLikes(data.likes_count || 0)
+        const l = await hasLiked(user.id, id)
+        if (alive) setLiked(l)
+      }
+      setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [id, user.id])
 
-  const loadProject = async () => {
-    const { data } = await getProject(id)
-    if (data) {
-      setProject(data)
-      setLikes(data.likes_count || 0)
-      const l = await hasLiked(user.id, id)
-      setLiked(l)
+  const toggleLike = async () => {
+    if (busy) return
+    setBusy(true)
+    const next = !liked
+    setLiked(next)
+    setLikes(n => n + (next ? 1 : -1))
+    try {
+      next ? await likeProject(user.id, id) : await unlikeProject(user.id, id)
+    } catch {
+      setLiked(!next)
+      setLikes(n => n + (next ? -1 : 1))
+    } finally {
+      setBusy(false)
     }
-    setLoading(false)
   }
 
-  const handleLike = async () => {
-    if (liked) {
-      await unlikeProject(user.id, id)
-      setLiked(false)
-      setLikes(l => l - 1)
-    } else {
-      await likeProject(user.id, id)
-      setLiked(true)
-      setLikes(l => l + 1)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!confirm('Delete this project? This cannot be undone.')) return
+  const remove = async () => {
+    if (!window.confirm('Delete this project? This cannot be undone.')) return
     await deleteProject(id)
     navigate('/home')
   }
 
-  if (loading) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',color:'#6B7280' }}>Loading...</div>
-  if (!project) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',color:'#6B7280' }}>Project not found</div>
+  if (loading) {
+    return (
+      <div className="page">
+        <style>{CSS}</style>
+        <div className="pd-wrap">
+          <div className="skel" style={{ height: 300, marginBottom: '1.75rem' }} />
+          <div className="skel" style={{ height: 120, marginBottom: '1.25rem' }} />
+          <div className="skel" style={{ height: 160 }} />
+        </div>
+      </div>
+    )
+  }
 
-  const initials = (project.profiles?.full_name || project.profiles?.username || 'U')
-    .split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)
+  if (!project) {
+    return (
+      <div className="page">
+        <style>{CSS}</style>
+        <div className="pd-wrap">
+          <div className="empty">
+            <div className="empty-icon">?</div>
+            <h3 className="h3" style={{ marginBottom: '.5rem' }}>Project not found</h3>
+            <p className="dim" style={{ marginBottom: '1.5rem' }}>
+              It may have been deleted.
+            </p>
+            <Link to="/discover" className="btn btn-primary">Browse projects →</Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const author = project.profiles
+  const aname  = author?.full_name || author?.username || 'builder'
 
   return (
-    <div style={{ maxWidth:800, margin:'0 auto', padding:'3rem 2rem' }}>
-      {/* Back */}
-      <Link to="/home" style={{
-        display:'inline-flex', alignItems:'center', gap:'.4rem',
-        color:'#6B7280', fontSize:'.82rem', textDecoration:'none',
-        marginBottom:'2rem', transition:'color .2s',
-      }}>
-        <ArrowLeft size={14}/> Back
-      </Link>
+    <div className="page">
+      <style>{CSS}</style>
+      <div className="pd-wrap">
 
-      {/* Cover image */}
-      {project.image_url && (
-        <div style={{ width:'100%', height:320, borderRadius:14, overflow:'hidden', marginBottom:'2rem', background:'#0D0D1A' }}>
-          <img src={project.image_url} alt={project.title} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+        <Link to="/home" className="pd-back">← Back</Link>
+
+        {/* Cover */}
+        <div className="pd-cover rise">
+          {project.image_url
+            ? <img src={project.image_url} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} />
+            : <span className="pd-glyph">{(project.title || '?')[0].toUpperCase()}</span>
+          }
         </div>
-      )}
 
-      {/* Header */}
-      <div style={{
-        background:'#08080F', border:'1px solid rgba(139,92,246,0.15)',
-        borderRadius:16, padding:'2rem', marginBottom:'1.5rem',
-      }}>
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem', flexWrap:'wrap' }}>
+        {/* Header */}
+        <header className="pd-head rise" style={{ animationDelay: '.05s' }}>
           <div>
-            <h1 style={{ fontFamily:'Orbitron,sans-serif', fontSize:'1.5rem', fontWeight:700, color:'#fff', marginBottom:'.5rem' }}>
-              {project.title}
-            </h1>
-            {/* Author */}
-            {project.profiles && (
-              <Link to={`/profile/${project.profiles.username}`} style={{ textDecoration:'none' }}>
-                <div style={{ display:'inline-flex', alignItems:'center', gap:'.5rem', color:'#9CA3AF', fontSize:'.82rem' }}>
-                  <div className="avatar" style={{ width:24, height:24, fontSize:'.6rem' }}>
-                    {project.profiles.avatar_url
-                      ? <img src={project.profiles.avatar_url} alt="" style={{ width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover' }}/>
-                      : initials}
-                  </div>
-                  @{project.profiles.username}
+            <h1 className="pd-title">{project.title}</h1>
+            {author && (
+              <Link to={`/profile/${author.username}`} className="pd-by">
+                <div className="av pd-by-av">
+                  {author.avatar_url
+                    ? <img src={author.avatar_url} alt="" />
+                    : initials(aname)}
                 </div>
+                @{author.username}
+                <span style={{ color: C.border }}>·</span>
+                {timeSince(project.created_at)}
               </Link>
             )}
           </div>
 
-          {/* Actions */}
-          <div style={{ display:'flex', gap:'.75rem', alignItems:'center', flexWrap:'wrap' }}>
-            <button onClick={handleLike} style={{
-              display:'inline-flex', alignItems:'center', gap:'.4rem',
-              padding:'.6rem 1.25rem', borderRadius:8,
-              background: liked ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.04)',
-              border: liked ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.08)',
-              color: liked ? '#F472B6' : '#6B7280',
-              cursor:'pointer', fontFamily:'Space Grotesk,sans-serif',
-              fontWeight:600, fontSize:'.82rem', transition:'all .2s',
-            }}>
-              <Heart size={14} fill={liked ? '#F472B6' : 'none'}/> {likes}
+          <div className="pd-acts">
+            <button
+              className={`pd-like ${liked ? 'on' : ''}`}
+              onClick={toggleLike}
+              aria-pressed={liked}
+              aria-label={liked ? 'Unlike' : 'Like'}
+            >
+              ♥ {likes}
             </button>
-            {project.github_url && (
-              <a href={project.github_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost"
-                style={{ fontSize:'.82rem', padding:'.5rem 1rem' }}>
-                <Github size={14}/> Code
-              </a>
-            )}
+
             {project.live_url && (
-              <a href={project.live_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline"
-                style={{ fontSize:'.82rem', padding:'.5rem 1rem' }}>
-                <ExternalLink size={14}/> Live demo
+              <a href={project.live_url} target="_blank" rel="noopener noreferrer"
+                className="btn btn-primary btn-sm">
+                Live demo ↗
               </a>
             )}
-            {isOwner && (
-              <button onClick={handleDelete} style={{
-                display:'inline-flex', alignItems:'center', gap:'.35rem',
-                padding:'.5rem .85rem', borderRadius:8,
-                background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)',
-                color:'#F472B6', cursor:'pointer', fontSize:'.8rem',
-                fontFamily:'Space Grotesk,sans-serif', transition:'all .2s',
-              }}>
-                <Trash2 size={13}/>
+            {project.github_url && (
+              <a href={project.github_url} target="_blank" rel="noopener noreferrer"
+                className="btn btn-ghost btn-sm">
+                Code ↗
+              </a>
+            )}
+            {owner && (
+              <button onClick={remove} className="btn btn-danger btn-sm" aria-label="Delete project">
+                Delete
               </button>
             )}
           </div>
-        </div>
+        </header>
+
+        {/* Problem solved */}
+        {project.problem_solved && (
+          <section className="pd-hero rise" style={{ animationDelay: '.1s' }}>
+            <div className="pd-hero-l">Problem solved</div>
+            <p className="pd-hero-t">{project.problem_solved}</p>
+          </section>
+        )}
+
+        {/* Description */}
+        {project.description && (
+          <section className="pd-sec rise" style={{ animationDelay: '.14s' }}>
+            <div className="pd-sec-h">About</div>
+            <p className="pd-sec-t">{project.description}</p>
+          </section>
+        )}
+
+        {/* Stack */}
+        {project.technologies?.length > 0 && (
+          <section className="pd-sec rise" style={{ animationDelay: '.18s' }}>
+            <div className="pd-sec-h">Built with</div>
+            <div className="pd-tags">
+              {project.technologies.map(t => (
+                <span key={t} className={`pill ${tagClass(t)}`}
+                  style={{ padding: '.35rem .9rem', fontSize: '.8rem' }}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
-
-      {/* Problem solved — hero block */}
-      {project.problem_solved && (
-        <div style={{
-          background:'linear-gradient(135deg,rgba(6,182,212,0.06),rgba(139,92,246,0.04))',
-          border:'1px solid rgba(6,182,212,0.2)',
-          borderRadius:14, padding:'1.75rem', marginBottom:'1.5rem',
-        }}>
-          <div style={{ fontSize:'.7rem', fontWeight:600, letterSpacing:'.12em', textTransform:'uppercase',
-            color:'#22D3EE', marginBottom:'.75rem', display:'flex', alignItems:'center', gap:'.5rem' }}>
-            <div style={{ width:16, height:1, background:'#22D3EE', boxShadow:'0 0 4px #22D3EE' }}/>
-            Problem solved
-          </div>
-          <p style={{ color:'#fff', lineHeight:1.75, fontSize:'1rem' }}>{project.problem_solved}</p>
-        </div>
-      )}
-
-      {/* Description */}
-      {project.description && (
-        <div style={{
-          background:'#08080F', border:'1px solid rgba(139,92,246,0.1)',
-          borderRadius:14, padding:'1.75rem', marginBottom:'1.5rem',
-        }}>
-          <div className="s-label" style={{ marginBottom:'.75rem' }}>About</div>
-          <p style={{ color:'#9CA3AF', lineHeight:1.8 }}>{project.description}</p>
-        </div>
-      )}
-
-      {/* Tech stack */}
-      {project.technologies?.length > 0 && (
-        <div style={{
-          background:'#08080F', border:'1px solid rgba(139,92,246,0.1)',
-          borderRadius:14, padding:'1.75rem',
-        }}>
-          <div className="s-label" style={{ marginBottom:'1rem' }}>Tech stack</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'.5rem' }}>
-            {project.technologies.map((t,i) => (
-              <span key={i} style={{
-                padding:'.35rem 1rem', borderRadius:100,
-                fontSize:'.8rem', fontWeight:500,
-                background:'rgba(139,92,246,0.1)', color:'#A78BFA',
-                border:'1px solid rgba(139,92,246,0.2)',
-              }}>{t}</span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
