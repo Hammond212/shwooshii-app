@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Compass, Plus, Settings, LogOut, Menu, X } from 'lucide-react'
-import { signOut } from '../lib/supabase'
+import { signOut } from '../lib/supabase.js'
 
 export default function Nav({ user, onLogout }) {
   const location = useLocation()
@@ -43,7 +43,7 @@ export default function Nav({ user, onLogout }) {
       }} />
 
       {/* Logo */}
-      <Link to="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
+      <Link to="/home" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
         <div style={{
           width: 34, height: 34, borderRadius: 8,
           background: 'linear-gradient(135deg,#6D28D9,#06B6D4)',
@@ -58,7 +58,7 @@ export default function Nav({ user, onLogout }) {
 
       {/* Desktop links */}
       <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }} className="desktop-nav">
-        <Link to="/" style={linkStyle('/')}><Home size={15}/> Home</Link>
+        <Link to="/home" style={linkStyle("/home")}><Home size={15}/> Home</Link>
         <Link to="/discover" style={linkStyle('/discover')}><Compass size={15}/> Discover</Link>
         <Link to="/project/new" style={{
           ...linkStyle('/project/new'),
