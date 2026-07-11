@@ -43,7 +43,7 @@ export default function ProjectDetail({ user }) {
   const handleDelete = async () => {
     if (!confirm('Delete this project? This cannot be undone.')) return
     await deleteProject(id)
-    navigate('/')
+    navigate('/home')
   }
 
   if (loading) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',color:'#6B7280' }}>Loading...</div>
@@ -55,7 +55,7 @@ export default function ProjectDetail({ user }) {
   return (
     <div style={{ maxWidth:800, margin:'0 auto', padding:'3rem 2rem' }}>
       {/* Back */}
-      <Link to="/" style={{
+      <Link to="/home" style={{
         display:'inline-flex', alignItems:'center', gap:'.4rem',
         color:'#6B7280', fontSize:'.82rem', textDecoration:'none',
         marginBottom:'2rem', transition:'color .2s',
