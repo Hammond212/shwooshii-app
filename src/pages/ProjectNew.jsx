@@ -78,7 +78,7 @@ export default function ProjectNew({ user }) {
       if (data && data[0] && data[0].id) {
         navigate(`/project/${data[0].id}`)
       } else {
-        navigate('/')
+        navigate('/home')
       }
     } catch (err) {
       setError(err.message || 'Failed to create project')
