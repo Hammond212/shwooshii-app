@@ -1,302 +1,472 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllProjects, getAllProfiles, searchUsers } from '../lib/supabase.js'
-import { initials, timeSince, tagClass } from '../lib/theme.js'
-import ProjectCard from '../components/ProjectCard.jsx'
+import { getAllProjects, getAllProfiles, searchUsers, likeProject, unlikeProject, hasLiked } from '../lib/supabase.js'
+import { initials, timeSince } from '../lib/theme.js'
 
 /* ── Tokens ── */
-const T = {
-  l: { // light
-    bg:     '#FFFFFF',
-    bg2:    '#FAFAF8',
-    ink:    '#0F0F1A',
-    ink2:   '#3D3D5C',
-    muted:  '#8888A8',
-    border: '#F0EEE8',
-    card:   '#FFFFFF',
-    cardB:  '#F0EEE8',
-    o:      '#FF6B35',
-    o2:     '#FF8C5A',
-    oBg:    '#FFF1EC',
-    input:  '#FAFAF8',
-  },
-  d: { // dark
-    bg:     '#0A0A0F',
-    bg2:    '#111118',
-    ink:    '#F0F0FF',
-    ink2:   '#A0A0C0',
-    muted:  '#5A5A80',
-    border: '#1E1E2E',
-    card:   '#13131F',
-    cardB:  '#1E1E2E',
-    o:      '#FF6B35',
-    o2:     '#FF8C5A',
-    oBg:    'rgba(255,107,53,0.12)',
-    input:  '#0E0E18',
-  },
-}
+const mk = (d) => ({
+  bg:     d ? '#0A0A0F' : '#FAFAFA',
+  bg2:    d ? '#111118' : '#FFFFFF',
+  bg3:    d ? '#16161F' : '#F5F4F0',
+  ink:    d ? '#F0F0FF' : '#0F0F1A',
+  ink2:   d ? '#A0A0C0' : '#3D3D5C',
+  muted:  d ? '#5A5A80' : '#9090A8',
+  border: d ? '#1E1E2E' : '#EFEFEF',
+  o:      '#FF6B35',
+  o2:     '#FF8C5A',
+  oBg:    d ? 'rgba(255,107,53,0.14)' : '#FFF1EC',
+  card:   d ? '#111118' : '#FFFFFF',
+  cardB:  d ? '#1E1E2E' : '#EFEFEF',
+  input:  d ? '#16161F' : '#FFFFFF',
+  shadow: d ? '0 2px 20px rgba(0,0,0,0.5)' : '0 2px 20px rgba(15,15,26,0.08)',
+})
 
-const CSS = (d) => {
-  const c = d ? T.d : T.l
+const makeCSS = (d) => {
+  const c = mk(d)
   return `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:${c.bg};color:${c.ink};font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+body{background:${c.bg};color:${c.ink};font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+button{font-family:'Plus Jakarta Sans',sans-serif}
 
-.disc{min-height:100vh;background:${c.bg}}
-.disc-wrap{max-width:1100px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+/* ── ROOT ── */
+.disc-root{min-height:100vh;background:${c.bg}}
+.disc-layout{max-width:1060px;margin:0 auto;padding:0 1rem;display:grid;grid-template-columns:1fr 340px;gap:2.5rem}
+@media(max-width:860px){.disc-layout{grid-template-columns:1fr;gap:0}}
 
-/* ── Header ── */
-.disc-hd{margin-bottom:2.5rem}
-.disc-eyebrow{
-  font-size:.7rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
-  color:${c.o};display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;
+/* ── TOPBAR ── */
+.disc-topbar{
+  position:sticky;top:68px;z-index:80;
+  background:${c.bg}EE;backdrop-filter:blur(16px);
+  border-bottom:1px solid ${c.border};
+  padding:.75rem 0;margin-bottom:1.5rem;
 }
-.disc-eyebrow::before{content:'';width:18px;height:2px;border-radius:1px;background:${c.o}}
-.disc-title{
-  font-size:clamp(2rem,5vw,3.2rem);font-weight:900;
-  letter-spacing:-.04em;line-height:1.08;
-  color:${c.ink};margin-bottom:.6rem;
+.disc-topbar-inner{
+  max-width:1060px;margin:0 auto;padding:0 1rem;
+  display:flex;align-items:center;gap:.75rem;
 }
-.disc-title span{color:${c.o}}
-.disc-sub{color:${c.muted};font-size:.95rem;line-height:1.65;max-width:480px}
-
-/* ── Stats strip ── */
-.disc-stats{
-  display:flex;gap:2.5rem;padding:1.25rem 0;
-  border-top:1px solid ${c.border};border-bottom:1px solid ${c.border};
-  margin-bottom:2rem;flex-wrap:wrap;
-}
-.disc-stat{display:flex;align-items:baseline;gap:.4rem}
-.disc-stat-n{font-size:1.5rem;font-weight:900;letter-spacing:-.03em;color:${c.o}}
-.disc-stat-l{font-size:.8rem;color:${c.muted};font-weight:500}
-
-/* ── Search + tabs ── */
-.disc-bar{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;position:relative}
-.disc-search{
-  position:relative;flex:1;min-width:240px;
-}
-.disc-search-ic{
-  position:absolute;left:1.1rem;top:50%;transform:translateY(-50%);
-  color:${c.muted};pointer-events:none;font-size:1rem;
-}
-.disc-search input{
-  width:100%;padding:.85rem 1rem .85rem 2.85rem;
-  background:${c.input};
-  border:1.5px solid ${c.border};
-  border-radius:100px;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:.9rem;color:${c.ink};outline:none;
+.disc-search-wrap{position:relative;flex:1}
+.disc-search-wrap input{
+  width:100%;padding:.7rem 1rem .7rem 2.6rem;
+  background:${c.input};border:1.5px solid ${c.border};
+  border-radius:100px;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.875rem;color:${c.ink};outline:none;
   transition:border-color .2s,box-shadow .2s;
 }
-.disc-search input:focus{
-  border-color:${c.o};
-  box-shadow:0 0 0 4px rgba(255,107,53,0.1);
-}
-.disc-search input::placeholder{color:${c.muted}}
-
-.disc-tabs{
-  display:flex;background:${c.bg2};
-  border:1px solid ${c.border};border-radius:100px;padding:4px;flex-shrink:0;
-}
-.disc-tab{
-  padding:.52rem 1.2rem;border:none;border-radius:100px;
-  background:transparent;cursor:pointer;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-weight:700;font-size:.82rem;color:${c.muted};
-  transition:all .22s;
-}
-.disc-tab.on{
-  background:${c.o};color:#fff;
-  box-shadow:0 4px 12px rgba(255,107,53,0.3);
-}
-
-/* ── Search dropdown ── */
-.disc-drop{
-  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;
+.disc-search-wrap input:focus{border-color:${c.o};box-shadow:0 0 0 3px rgba(255,107,53,0.1)}
+.disc-search-wrap input::placeholder{color:${c.muted}}
+.disc-search-ic{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:${c.muted};pointer-events:none}
+.disc-search-drop{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:100;
   background:${c.card};border:1px solid ${c.border};
-  border-radius:14px;overflow:hidden;
-  box-shadow:0 12px 40px rgba(15,15,26,${d?'.5':'.12'});
+  border-radius:16px;overflow:hidden;box-shadow:${c.shadow};
 }
-.disc-row{
-  display:flex;align-items:center;gap:.7rem;
-  padding:.8rem 1.1rem;border-bottom:1px solid ${c.border};
-  cursor:pointer;transition:background .15s;text-decoration:none;
+.disc-search-row{
+  display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;
+  border-bottom:1px solid ${c.border};transition:background .15s;cursor:pointer;
 }
-.disc-row:last-child{border-bottom:none}
-.disc-row:hover{background:${c.oBg}}
-.disc-row-av{
+.disc-search-row:last-child{border:none}
+.disc-search-row:hover{background:${c.oBg}}
+.disc-search-av{
   width:32px;height:32px;border-radius:50%;flex-shrink:0;
   background:linear-gradient(135deg,${c.o},#FF5FA2);
   display:flex;align-items:center;justify-content:center;
   font-size:.6rem;font-weight:800;color:#fff;overflow:hidden;
 }
-.disc-row-av img{width:100%;height:100%;object-fit:cover}
-.disc-row-n{font-size:.875rem;font-weight:700;color:${c.ink}}
-.disc-row-h{font-size:.72rem;color:${c.muted}}
-.disc-row-role{
-  margin-left:auto;padding:.2rem .65rem;border-radius:100px;
-  background:${c.oBg};color:${c.o};
-  font-size:.62rem;font-weight:700;letter-spacing:.04em;
-}
+.disc-search-av img{width:100%;height:100%;object-fit:cover}
 
-/* ── Filters ── */
-.disc-filters{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-bottom:2rem}
-.disc-flabel{font-size:.68rem;font-weight:800;color:${c.muted};
-  letter-spacing:.1em;text-transform:uppercase;margin-right:.25rem}
-.disc-chip{
-  padding:.42rem 1rem;border-radius:100px;
+/* Tabs */
+.disc-tabs{display:flex;background:${c.bg3};border:1px solid ${c.border};border-radius:100px;padding:3px;flex-shrink:0}
+.disc-tab{
+  padding:.48rem 1.1rem;border:none;border-radius:100px;background:transparent;
+  cursor:pointer;font-weight:700;font-size:.8rem;color:${c.muted};transition:all .2s;
+}
+.disc-tab.on{background:${c.o};color:#fff;box-shadow:0 3px 10px rgba(255,107,53,0.35)}
+
+/* Theme toggle */
+.disc-theme{
+  width:38px;height:38px;border-radius:100px;flex-shrink:0;
+  background:${c.bg3};border:1px solid ${c.border};
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:1rem;color:${c.muted};transition:all .2s;
+}
+.disc-theme:hover{border-color:${c.o};color:${c.o}}
+
+/* ── STORIES ROW ── */
+.stories{
+  display:flex;gap:.75rem;overflow-x:auto;padding:.75rem 0 1.25rem;
+  scrollbar-width:none;-ms-overflow-style:none;
+}
+.stories::-webkit-scrollbar{display:none}
+.story{
+  display:flex;flex-direction:column;align-items:center;gap:.4rem;
+  flex-shrink:0;cursor:pointer;
+}
+.story-ring{
+  width:58px;height:58px;border-radius:50%;padding:2.5px;
+  background:linear-gradient(135deg,${c.o},#FF5FA2);
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.story-ring:hover{transform:scale(1.08)}
+.story-ring.seen{background:${c.border}}
+.story-av{
+  width:100%;height:100%;border-radius:50%;
+  background:${d ? '#1A1A28' : '#EEE'};
+  border:2.5px solid ${c.bg};
+  display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:800;color:${c.o};overflow:hidden;
+}
+.story-av img{width:100%;height:100%;object-fit:cover}
+.story-name{font-size:.65rem;font-weight:600;color:${c.ink2};
+  max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+
+/* ── STACK PILLS ── */
+.stack-pills{
+  display:flex;gap:.4rem;overflow-x:auto;padding-bottom:.75rem;
+  margin-bottom:1.5rem;scrollbar-width:none;
+}
+.stack-pills::-webkit-scrollbar{display:none}
+.sp{
+  flex-shrink:0;padding:.4rem .9rem;border-radius:100px;
   border:1.5px solid ${c.border};background:transparent;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:.8rem;font-weight:600;color:${c.muted};
-  cursor:pointer;transition:all .18s;
+  font-size:.78rem;font-weight:600;color:${c.muted};
+  cursor:pointer;transition:all .18s;white-space:nowrap;
 }
-.disc-chip:hover{border-color:${c.o};color:${c.o}}
-.disc-chip.on{
-  border-color:${c.o};background:${c.oBg};color:${c.o};
-}
+.sp:hover{border-color:${c.o};color:${c.o}}
+.sp.on{background:${c.o};border-color:${c.o};color:#fff;box-shadow:0 3px 10px rgba(255,107,53,0.3)}
 
-/* ── Grid ── */
-.disc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1.15rem}
-.disc-grid-dev{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
-
-/* ── Developer card ── */
-.dv{
+/* ── POST CARD (feed item) ── */
+.post{
   background:${c.card};border:1px solid ${c.border};
-  border-radius:18px;padding:1.4rem;cursor:pointer;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  transition:transform .25s cubic-bezier(.34,1.56,.64,1),
-             box-shadow .25s,border-color .25s;
-  text-decoration:none;display:block;
+  border-radius:20px;margin-bottom:1rem;overflow:hidden;
+  transition:box-shadow .25s;
 }
-.dv:hover{
-  transform:translateY(-4px);
-  box-shadow:0 12px 36px rgba(255,107,53,0.12);
-  border-color:${c.o};
-}
-.dv-top{display:flex;align-items:center;gap:.85rem;margin-bottom:1rem}
-.dv-av{
-  width:46px;height:46px;border-radius:50%;flex-shrink:0;
+.post:hover{box-shadow:${c.shadow}}
+
+/* Post header */
+.post-hd{display:flex;align-items:center;gap:.75rem;padding:1rem 1.15rem .75rem}
+.post-av{
+  width:40px;height:40px;border-radius:50%;flex-shrink:0;
   background:linear-gradient(135deg,${c.o},#FF5FA2);
   display:flex;align-items:center;justify-content:center;
-  font-size:.82rem;font-weight:800;color:#fff;overflow:hidden;
+  font-size:.72rem;font-weight:800;color:#fff;overflow:hidden;
 }
-.dv-av img{width:100%;height:100%;object-fit:cover}
-.dv-n{font-size:.9rem;font-weight:800;color:${c.ink};
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:.15rem}
-.dv-h{font-size:.75rem;color:${c.muted}}
-.dv-badge{
-  margin-left:auto;padding:.22rem .65rem;border-radius:100px;
-  background:${c.oBg};color:${c.o};
-  font-size:.6rem;font-weight:700;letter-spacing:.04em;flex-shrink:0;
+.post-av img{width:100%;height:100%;object-fit:cover}
+.post-meta{flex:1;min-width:0}
+.post-name{font-size:.9rem;font-weight:800;color:${c.ink}}
+.post-detail{font-size:.75rem;color:${c.muted};margin-top:.08rem}
+.post-live{
+  display:flex;align-items:center;gap:5px;
+  background:${c.oBg};border:1px solid rgba(255,107,53,0.25);
+  border-radius:100px;padding:3px 10px;
+  font-size:.62rem;font-weight:800;color:${c.o};letter-spacing:.06em;
+  flex-shrink:0;
 }
-.dv-foot{
-  display:flex;align-items:center;justify-content:space-between;
-  padding-top:.85rem;border-top:1px solid ${c.border};
+.post-live-dot{
+  width:5px;height:5px;border-radius:50%;background:${c.o};
+  animation:livePulse 1.8s infinite;
 }
-.dv-role{
-  padding:.28rem .8rem;border-radius:100px;
-  background:${c.oBg};color:${c.o};
-  font-size:.68rem;font-weight:700;letter-spacing:.04em;
-}
-.dv-score{font-size:.78rem;font-weight:800;color:${c.o}}
-.dv-loc{
-  margin-top:.75rem;padding-top:.75rem;border-top:1px solid ${c.border};
-  font-size:.75rem;color:${c.muted};
-}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
 
-/* ── Empty ── */
-.disc-empty{
-  grid-column:1/-1;text-align:center;padding:4.5rem 2rem;
-  background:${c.bg2};border:1.5px dashed ${c.border};border-radius:20px;
-}
-.disc-empty-icon{
-  width:56px;height:56px;border-radius:16px;margin:0 auto 1.25rem;
-  background:${c.oBg};color:${c.o};
+/* Post media */
+.post-media{
+  width:100%;background:linear-gradient(135deg,${c.oBg},${d?'rgba(255,107,53,0.05)':'#FFF8F5'});
+  position:relative;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
-  font-size:1.5rem;font-weight:800;
+  min-height:200px;
 }
-.disc-empty h3{font-size:1rem;font-weight:800;color:${c.ink};margin-bottom:.5rem}
-.disc-empty p{font-size:.875rem;color:${c.muted};max-width:340px;margin:0 auto 1.5rem;line-height:1.65}
-.disc-btn{
+.post-media img{width:100%;object-fit:cover;display:block;transition:transform .5s ease}
+.post:hover .post-media img{transform:scale(1.02)}
+.post-glyph{
+  font-size:4.5rem;font-weight:900;letter-spacing:-.04em;
+  color:${c.o};opacity:.18;user-select:none;
+}
+
+/* Post body */
+.post-body{padding:.9rem 1.15rem}
+.post-title{font-size:1.05rem;font-weight:800;color:${c.ink};
+  letter-spacing:-.02em;margin-bottom:.5rem;line-height:1.3}
+.post-prob{
+  border-left:3px solid ${c.o};background:${c.oBg};
+  border-radius:0 10px 10px 0;padding:.55rem .75rem;
+  margin-bottom:.75rem;
+}
+.post-prob-l{font-size:.62rem;font-weight:800;color:${c.o};
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem}
+.post-prob-t{font-size:.82rem;color:${c.ink2};line-height:1.55;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.post-tags{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.75rem}
+.post-tag{
+  padding:.2rem .65rem;border-radius:100px;
+  background:${c.oBg};color:${c.o};
+  font-size:.65rem;font-weight:700;letter-spacing:.03em;
+}
+
+/* Post actions */
+.post-actions{
+  display:flex;align-items:center;gap:0;
+  padding:.6rem 1.15rem .9rem;border-top:1px solid ${c.border};
+}
+.post-act{
+  display:flex;align-items:center;gap:.35rem;
+  padding:.5rem .85rem;border-radius:100px;border:none;background:transparent;
+  cursor:pointer;font-size:.82rem;font-weight:700;color:${c.muted};
+  transition:all .2s;
+}
+.post-act:hover{background:${c.oBg};color:${c.o}}
+.post-act.liked{color:${c.o}}
+.post-act-sep{width:1px;height:18px;background:${c.border};margin:0 .25rem}
+.post-link{
+  display:flex;align-items:center;gap:.35rem;
+  padding:.5rem .85rem;border-radius:100px;
+  font-size:.82rem;font-weight:700;color:${c.muted};
+  transition:all .2s;margin-left:auto;
+}
+.post-link:hover{background:${c.oBg};color:${c.o}}
+
+/* ── EXPLORE GRID (builders tab) ── */
+.explore-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:3px;
+  border-radius:12px;overflow:hidden;
+}
+.explore-cell{
+  aspect-ratio:1;background:${c.bg3};
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;position:relative;cursor:pointer;
+}
+.explore-cell img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.explore-cell:hover img{transform:scale(1.08)}
+.explore-cell-glyph{
+  font-size:2.2rem;font-weight:900;color:${c.o};opacity:.25;
+}
+.explore-cell-ov{
+  position:absolute;inset:0;background:rgba(255,107,53,0);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .25s;
+}
+.explore-cell:hover .explore-cell-ov{background:rgba(255,107,53,0.12)}
+
+/* ── SIDEBAR ── */
+.disc-sidebar{padding-top:1.5rem}
+@media(max-width:860px){.disc-sidebar{display:none}}
+
+.side-card{
+  background:${c.card};border:1px solid ${c.border};
+  border-radius:20px;padding:1.25rem;margin-bottom:1.25rem;
+}
+.side-label{
+  font-size:.68rem;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:${c.o};
+  display:flex;align-items:center;gap:.4rem;margin-bottom:1rem;
+}
+.side-label::before{content:'';width:14px;height:2px;background:${c.o};border-radius:1px}
+
+/* Builder row */
+.builder-row{
+  display:flex;align-items:center;gap:.65rem;
+  padding:.5rem 0;border-bottom:1px solid ${c.border};
+}
+.builder-row:last-child{border:none;padding-bottom:0}
+.br-av{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,${c.o},#FF5FA2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;font-weight:800;color:#fff;overflow:hidden;
+}
+.br-av img{width:100%;height:100%;object-fit:cover}
+.br-name{font-size:.85rem;font-weight:700;color:${c.ink};
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.br-handle{font-size:.72rem;color:${c.muted}}
+.br-follow{
+  margin-left:auto;flex-shrink:0;
+  padding:.32rem .85rem;border-radius:100px;border:1.5px solid ${c.o};
+  background:transparent;color:${c.o};font-size:.75rem;font-weight:700;
+  cursor:pointer;transition:all .2s;
+}
+.br-follow:hover{background:${c.o};color:#fff}
+.br-follow.on{background:${c.o};color:#fff;border-color:${c.o}}
+
+/* Trending tags */
+.trend-tag{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.6rem 0;border-bottom:1px solid ${c.border};cursor:pointer;
+}
+.trend-tag:last-child{border:none;padding-bottom:0}
+.trend-tag-n{font-size:.875rem;font-weight:700;color:${c.ink}}
+.trend-tag-c{font-size:.75rem;color:${c.muted}}
+
+/* ── EMPTY ── */
+.post-empty{
+  background:${c.card};border:1.5px dashed ${c.border};
+  border-radius:20px;padding:4rem 2rem;text-align:center;margin-bottom:1rem;
+}
+.post-empty-ic{
+  width:52px;height:52px;border-radius:16px;margin:0 auto 1rem;
+  background:${c.oBg};color:${c.o};font-size:1.4rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+}
+.post-empty h3{font-size:1rem;font-weight:800;color:${c.ink};margin-bottom:.45rem}
+.post-empty p{font-size:.875rem;color:${c.muted};max-width:300px;margin:0 auto 1.5rem;line-height:1.65}
+.post-empty-btn{
   display:inline-flex;align-items:center;gap:.4rem;
-  padding:.7rem 1.5rem;border-radius:100px;border:none;cursor:pointer;
-  background:${c.o};color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
-  font-weight:700;font-size:.875rem;
-  box-shadow:0 4px 14px rgba(255,107,53,0.3);
-  transition:all .2s;text-decoration:none;
+  padding:.7rem 1.5rem;border-radius:100px;border:none;
+  background:${c.o};color:#fff;font-weight:700;font-size:.875rem;cursor:pointer;
+  box-shadow:0 4px 14px rgba(255,107,53,0.3);transition:all .2s;text-decoration:none;
 }
-.disc-btn:hover{background:${c.o2};transform:translateY(-2px)}
+.post-empty-btn:hover{background:${c.o2};transform:translateY(-2px)}
 
-/* ── Footer ── */
-.disc-count{
-  text-align:center;margin-top:3rem;padding-top:2rem;
-  border-top:1px solid ${c.border};
-  font-size:.78rem;color:${c.muted};letter-spacing:.05em;
-}
-
-/* ── Skeleton ── */
+/* ── SKELETON ── */
 @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
 .skel{
   border-radius:16px;
-  background:linear-gradient(90deg,${c.bg2} 25%,${d?'#1A1A28':'#EDEAE3'} 50%,${c.bg2} 75%);
+  background:linear-gradient(90deg,${c.bg3} 25%,${d?'#1E1E2E':'#E8E6E0'} 50%,${c.bg3} 75%);
   background-size:200% 100%;animation:shimmer 1.5s infinite;
 }
-
-/* ── Entrance ── */
-@keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.rise{animation:riseIn .5s cubic-bezier(.23,1,.32,1) both}
-
-/* ── Theme toggle ── */
-.disc-theme-btn{
-  display:flex;align-items:center;justify-content:center;
-  width:42px;height:42px;border-radius:100px;flex-shrink:0;
-  background:${c.bg2};border:1.5px solid ${c.border};
-  cursor:pointer;font-size:1.1rem;
-  transition:all .2s;color:${c.ink};
+.post-skel{
+  background:${c.card};border:1px solid ${c.border};
+  border-radius:20px;margin-bottom:1rem;overflow:hidden;
 }
-.disc-theme-btn:hover{border-color:${c.o};color:${c.o}}
 
-@media(max-width:640px){
-  .disc-title{font-size:2rem}
-  .disc-bar{flex-direction:column}
-  .disc-tabs{align-self:flex-start}
-}
+/* ── ENTRANCE ── */
+@keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.rise{animation:riseIn .45s cubic-bezier(.23,1,.32,1) both}
+
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `}
 
-const FILTERS = ['All','React','Node.js','Python','Supabase','Next.js','Flutter','TypeScript','Go']
+const STACKS = ['All','React','Supabase','Node.js','Next.js','Python','Flutter','TypeScript','Go','Firebase']
 
-function DevCard({ profile }) {
-  const name = profile.full_name || profile.username
+function PostSkeleton() {
   return (
-    <Link to={`/profile/${profile.username}`} className="dv rise" aria-label={`View ${name}`}>
-      <div className="dv-top">
-        <div className="dv-av">
-          {profile.avatar_url
-            ? <img src={profile.avatar_url} alt="" />
-            : initials(name)}
+    <div className="post-skel">
+      <div style={{ padding: '1rem 1.15rem .75rem', display: 'flex', gap: '.75rem', alignItems: 'center' }}>
+        <div className="skel" style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div className="skel" style={{ height: 14, width: '45%', marginBottom: 6 }} />
+          <div className="skel" style={{ height: 11, width: '30%' }} />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="dv-n">{name}</div>
-          <div className="dv-h">@{profile.username}</div>
-        </div>
-        {profile.is_verified && <span className="dv-badge">✓ Verified</span>}
       </div>
-      <div className="dv-foot">
-        {profile.role && <span className="dv-role">{profile.role}</span>}
-        {profile.trust_score > 0 && (
-          <span className="dv-score">{profile.trust_score} pts</span>
+      <div className="skel" style={{ margin: '0 1.15rem', height: 220, borderRadius: 14 }} />
+      <div style={{ padding: '.9rem 1.15rem' }}>
+        <div className="skel" style={{ height: 16, width: '70%', marginBottom: 8 }} />
+        <div className="skel" style={{ height: 12, width: '90%', marginBottom: 6 }} />
+        <div className="skel" style={{ height: 12, width: '80%' }} />
+      </div>
+    </div>
+  )
+}
+
+function PostCard({ project, user }) {
+  const [liked, setLiked]   = useState(false)
+  const [likes, setLikes]   = useState(project.likes_count || 0)
+  const [busy, setBusy]     = useState(false)
+  const uname = project.profiles?.username || 'builder'
+  const fname = project.profiles?.full_name || uname
+  const avatar = project.profiles?.avatar_url
+  const techs = (project.technologies || []).slice(0, 4)
+
+  const toggleLike = async (e) => {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    const next = !liked
+    setLiked(next)
+    setLikes(n => n + (next ? 1 : -1))
+    try {
+      next
+        ? await likeProject(user.id, project.id)
+        : await unlikeProject(user.id, project.id)
+    } catch {
+      setLiked(!next)
+      setLikes(n => n + (next ? -1 : 1))
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <article className="post rise">
+      {/* Header */}
+      <div className="post-hd">
+        <Link to={`/profile/${uname}`} className="post-av">
+          {avatar ? <img src={avatar} alt="" /> : initials(fname)}
+        </Link>
+        <div className="post-meta">
+          <Link to={`/profile/${uname}`} className="post-name">{fname}</Link>
+          <div className="post-detail">@{uname} · {timeSince(project.created_at)}</div>
+        </div>
+        {project.live_url && (
+          <div className="post-live">
+            <span className="post-live-dot" />LIVE
+          </div>
         )}
       </div>
-      {profile.location && <div className="dv-loc">◎ {profile.location}</div>}
-    </Link>
+
+      {/* Media */}
+      <Link to={`/project/${project.id}`}>
+        <div className="post-media" style={{ height: project.image_url ? 'auto' : 200 }}>
+          {project.image_url
+            ? <img src={project.image_url} alt={project.title} loading="lazy"
+                onError={e => e.currentTarget.parentElement.style.minHeight = '200px'} />
+            : <span className="post-glyph">{(project.title || '?')[0].toUpperCase()}</span>
+          }
+        </div>
+      </Link>
+
+      {/* Body */}
+      <div className="post-body">
+        <Link to={`/project/${project.id}`}>
+          <h2 className="post-title">{project.title}</h2>
+        </Link>
+
+        {project.problem_solved && (
+          <div className="post-prob">
+            <div className="post-prob-l">Problem solved</div>
+            <p className="post-prob-t">{project.problem_solved}</p>
+          </div>
+        )}
+
+        {techs.length > 0 && (
+          <div className="post-tags">
+            {techs.map(t => <span key={t} className="post-tag">{t}</span>)}
+            {(project.technologies?.length || 0) > 4 && (
+              <span className="post-tag" style={{ opacity: .6 }}>+{project.technologies.length - 4}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="post-actions">
+        <button className={`post-act ${liked ? 'liked' : ''}`} onClick={toggleLike} aria-label="Like">
+          {liked ? '♥' : '♡'} {likes > 0 ? likes : ''}
+        </button>
+        <div className="post-act-sep" />
+        <Link to={`/project/${project.id}`} className="post-act">
+          💬 View
+        </Link>
+        {(project.github_url || project.live_url) && (
+          <>
+            <div className="post-act-sep" />
+            {project.live_url && (
+              <a href={project.live_url} target="_blank" rel="noopener noreferrer" className="post-link">
+                Open ↗
+              </a>
+            )}
+            {project.github_url && !project.live_url && (
+              <a href={project.github_url} target="_blank" rel="noopener noreferrer" className="post-link">
+                Code ↗
+              </a>
+            )}
+          </>
+        )}
+      </div>
+    </article>
   )
 }
 
 export default function Discover({ user }) {
   const [dark, setDark]         = useState(() => localStorage.getItem('shw-dark') === '1')
-  const [tab, setTab]           = useState('projects')
+  const [tab, setTab]           = useState('feed')
   const [projects, setProjects] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -306,15 +476,12 @@ export default function Discover({ user }) {
   const timerRef = useRef(null)
 
   const toggleDark = () => {
-    setDark(d => {
-      localStorage.setItem('shw-dark', d ? '0' : '1')
-      return !d
-    })
+    setDark(d => { localStorage.setItem('shw-dark', d ? '0' : '1'); return !d })
   }
 
   useEffect(() => {
     let alive = true
-    Promise.all([getAllProjects(32), getAllProfiles(24)]).then(([pr, pf]) => {
+    Promise.all([getAllProjects(40), getAllProfiles(20)]).then(([pr, pf]) => {
       if (!alive) return
       setProjects(pr.data || [])
       setProfiles(pf.data || [])
@@ -332,78 +499,55 @@ export default function Discover({ user }) {
     return () => clearTimeout(timerRef.current)
   }, [query])
 
+  const c = mk(dark)
+  const css = makeCSS(dark)
+
   const filtered = projects.filter(p =>
     filter === 'All' ||
     (p.technologies || []).some(t => t.toLowerCase().includes(filter.toLowerCase()))
   )
 
-  const css = CSS(dark)
+  // Trending stacks
+  const stackCounts = {}
+  projects.forEach(p => (p.technologies || []).forEach(t => { stackCounts[t] = (stackCounts[t] || 0) + 1 }))
+  const trending = Object.entries(stackCounts).sort((a,b)=>b[1]-a[1]).slice(0,6)
 
   return (
-    <div className="disc">
+    <div className="disc-root">
       <style>{css}</style>
-      <div className="disc-wrap">
 
-        {/* Header */}
-        <header className="disc-hd rise">
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <div>
-              <div className="disc-eyebrow">Discover</div>
-              <h1 className="disc-title">
-                Real projects.<br />
-                <span>Real builders.</span>
-              </h1>
-              <p className="disc-sub">
-                Find what people are shipping and who you want to build with.
-              </p>
-            </div>
-            <button className="disc-theme-btn" onClick={toggleDark} aria-label="Toggle dark mode">
-              {dark ? '☀' : '☽'}
-            </button>
-          </div>
-        </header>
-
-        {/* Stats */}
-        {!loading && (
-          <div className="disc-stats rise" style={{ animationDelay: '.06s' }}>
-            <div className="disc-stat">
-              <span className="disc-stat-n">{projects.length}</span>
-              <span className="disc-stat-l">projects</span>
-            </div>
-            <div className="disc-stat">
-              <span className="disc-stat-n">{profiles.length}</span>
-              <span className="disc-stat-l">builders</span>
-            </div>
-            <div className="disc-stat">
-              <span className="disc-stat-n">∞</span>
-              <span className="disc-stat-l">problems to solve</span>
-            </div>
-          </div>
-        )}
-
-        {/* Search + tabs */}
-        <div className="disc-bar rise" style={{ animationDelay: '.1s' }}>
-          <div className="disc-search">
+      {/* Sticky topbar */}
+      <div className="disc-topbar">
+        <div className="disc-topbar-inner">
+          <div className="disc-search-wrap">
             <span className="disc-search-ic" aria-hidden="true">⌕</span>
             <input
               type="search"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search builders by name or username…"
-              aria-label="Search builders"
+              placeholder="Search projects, builders…"
+              aria-label="Search"
             />
             {results.length > 0 && (
-              <div className="disc-drop">
+              <div className="disc-search-drop">
                 {results.map(r => (
-                  <Link key={r.id} to={`/profile/${r.username}`} className="disc-row" onClick={() => setQuery('')}>
-                    <div className="disc-row-av">
+                  <Link key={r.id} to={`/profile/${r.username}`}
+                    className="disc-search-row" onClick={() => setQuery('')}>
+                    <div className="disc-search-av">
                       {r.avatar_url ? <img src={r.avatar_url} alt="" /> : initials(r.full_name || r.username)}
                     </div>
                     <div>
-                      <div className="disc-row-n">{r.full_name || r.username}</div>
-                      <div className="disc-row-h">@{r.username}</div>
+                      <div style={{ fontSize: '.875rem', fontWeight: 700, color: c.ink }}>
+                        {r.full_name || r.username}
+                      </div>
+                      <div style={{ fontSize: '.72rem', color: c.muted }}>@{r.username}</div>
                     </div>
-                    {r.role && <span className="disc-row-role">{r.role}</span>}
+                    {r.role && (
+                      <span style={{ marginLeft: 'auto', padding: '.2rem .65rem', borderRadius: 100,
+                        background: c.oBg, color: c.o, fontSize: '.62rem', fontWeight: 700 }}>
+                        {r.role}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>
@@ -411,79 +555,196 @@ export default function Discover({ user }) {
           </div>
 
           <div className="disc-tabs" role="tablist">
-            {['projects', 'builders'].map(t => (
-              <button
-                key={t}
-                role="tab"
-                aria-selected={tab === t}
-                className={`disc-tab ${tab === t ? 'on' : ''}`}
-                onClick={() => setTab(t)}
-              >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+            {[['feed','Feed'],['explore','Explore'],['builders','Builders']].map(([v,l]) => (
+              <button key={v} role="tab" aria-selected={tab===v}
+                className={`disc-tab ${tab===v?'on':''}`} onClick={() => setTab(v)}>
+                {l}
               </button>
             ))}
           </div>
+
+          <button className="disc-theme" onClick={toggleDark} aria-label="Toggle dark mode">
+            {dark ? '☀' : '☽'}
+          </button>
         </div>
+      </div>
 
-        {/* Tech filters */}
-        {tab === 'projects' && (
-          <div className="disc-filters rise" style={{ animationDelay: '.14s' }}>
-            <span className="disc-flabel">Stack</span>
-            {FILTERS.map(f => (
-              <button
-                key={f}
-                className={`disc-chip ${filter === f ? 'on' : ''}`}
-                onClick={() => setFilter(f)}
-                aria-pressed={filter === f}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="disc-layout" style={{ paddingTop: '1rem' }}>
 
-        {/* Grid */}
-        {loading ? (
-          <div className="disc-grid">
-            {[0,1,2,3,4,5].map(i => (
-              <div key={i} className="skel" style={{ height: i % 3 === 0 ? 380 : 320 }} />
-            ))}
-          </div>
-        ) : tab === 'projects' ? (
-          <div className="disc-grid">
-            {filtered.length === 0 ? (
-              <div className="disc-empty">
-                <div className="disc-empty-icon">◎</div>
-                <h3>{filter === 'All' ? 'No projects yet' : `No ${filter} projects`}</h3>
+        {/* ── MAIN COLUMN ── */}
+        <main>
+          {/* Stories row — builder avatars */}
+          {!loading && profiles.length > 0 && (
+            <div className="stories rise">
+              {profiles.slice(0, 12).map(p => (
+                <Link key={p.id} to={`/profile/${p.username}`} className="story">
+                  <div className="story-ring">
+                    <div className="story-av">
+                      {p.avatar_url ? <img src={p.avatar_url} alt="" /> : initials(p.full_name || p.username)}
+                    </div>
+                  </div>
+                  <span className="story-name">{(p.full_name || p.username).split(' ')[0]}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Stack filter pills */}
+          {tab === 'feed' && (
+            <div className="stack-pills rise" style={{ animationDelay: '.06s' }}>
+              {STACKS.map(s => (
+                <button key={s} className={`sp ${filter===s?'on':''}`}
+                  onClick={() => setFilter(s)} aria-pressed={filter===s}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* FEED */}
+          {tab === 'feed' && (
+            loading ? (
+              [0,1,2,3].map(i => <PostSkeleton key={i} />)
+            ) : filtered.length === 0 ? (
+              <div className="post-empty">
+                <div className="post-empty-ic">◎</div>
+                <h3>{filter==='All'?'No projects yet':`No ${filter} projects`}</h3>
                 <p>Be the first to share one.</p>
-                <Link to="/project/new" className="disc-btn">Share a project →</Link>
+                <Link to="/project/new" className="post-empty-btn">+ Share a project</Link>
               </div>
             ) : (
-              filtered.map((p, i) => <ProjectCard key={p.id} project={p} index={i} />)
-            )}
-          </div>
-        ) : (
-          <div className={`disc-grid disc-grid-dev`}>
-            {profiles.length === 0 ? (
-              <div className="disc-empty">
-                <div className="disc-empty-icon">◆</div>
-                <h3>No builders yet</h3>
-                <p>Sign up and be one of the first.</p>
-              </div>
-            ) : (
-              profiles.map((p, i) => <DevCard key={p.id} profile={p} />)
-            )}
-          </div>
-        )}
+              filtered.map((p, i) => (
+                <div key={p.id} className="rise" style={{ animationDelay: `${i*.04}s` }}>
+                  <PostCard project={p} user={user} />
+                </div>
+              ))
+            )
+          )}
 
-        {/* Count */}
-        {!loading && (
-          <p className="disc-count">
-            {tab === 'projects'
-              ? `${filtered.length} project${filtered.length !== 1 ? 's' : ''}`
-              : `${profiles.length} builder${profiles.length !== 1 ? 's' : ''} on Shwooshii`}
-          </p>
-        )}
+          {/* EXPLORE — Instagram-style grid */}
+          {tab === 'explore' && (
+            <div className="rise">
+              {loading ? (
+                <div className="explore-grid">
+                  {[0,1,2,3,4,5,6,7,8].map(i => (
+                    <div key={i} className="explore-cell">
+                      <div className="skel" style={{ width:'100%',height:'100%',borderRadius:0 }} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="explore-grid">
+                  {projects.map(p => (
+                    <Link key={p.id} to={`/project/${p.id}`} className="explore-cell">
+                      {p.image_url
+                        ? <img src={p.image_url} alt={p.title} loading="lazy" />
+                        : <span className="explore-cell-glyph">{(p.title||'?')[0].toUpperCase()}</span>
+                      }
+                      <div className="explore-cell-ov" />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* BUILDERS */}
+          {tab === 'builders' && (
+            <div className="rise">
+              {loading ? (
+                [0,1,2,3,4].map(i => (
+                  <div key={i} style={{ background:c.card,border:`1px solid ${c.border}`,borderRadius:16,padding:'1rem',marginBottom:'1rem',display:'flex',gap:'.75rem',alignItems:'center' }}>
+                    <div className="skel" style={{ width:42,height:42,borderRadius:'50%',flexShrink:0 }} />
+                    <div style={{ flex:1 }}>
+                      <div className="skel" style={{ height:14,width:'40%',marginBottom:6 }} />
+                      <div className="skel" style={{ height:11,width:'25%' }} />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                profiles.map((p, i) => {
+                  const name = p.full_name || p.username
+                  return (
+                    <Link key={p.id} to={`/profile/${p.username}`}
+                      className="rise"
+                      style={{ display:'flex',alignItems:'center',gap:'.75rem',
+                        background:c.card,border:`1px solid ${c.border}`,borderRadius:16,
+                        padding:'1rem 1.15rem',marginBottom:'.75rem',
+                        transition:'all .25s',animationDelay:`${i*.04}s`,
+                        textDecoration:'none'
+                      }}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=c.o;e.currentTarget.style.transform='translateY(-2px)'}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=c.border;e.currentTarget.style.transform=''}}
+                    >
+                      <div className="br-av">
+                        {p.avatar_url?<img src={p.avatar_url} alt=""/>:initials(name)}
+                      </div>
+                      <div style={{ flex:1,minWidth:0 }}>
+                        <div className="br-name">{name}</div>
+                        <div className="br-handle">@{p.username}{p.role?` · ${p.role}`:''}</div>
+                      </div>
+                      {p.is_verified&&<span style={{ fontSize:'.7rem',fontWeight:800,color:c.o }}>✓</span>}
+                      {p.trust_score>0&&<span style={{ fontSize:'.78rem',fontWeight:800,color:c.o }}>{p.trust_score}pts</span>}
+                    </Link>
+                  )
+                })
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* ── SIDEBAR ── */}
+        <aside className="disc-sidebar">
+
+          {/* Trending stacks */}
+          {trending.length > 0 && (
+            <div className="side-card rise" style={{ animationDelay: '.1s' }}>
+              <div className="side-label">Trending stacks</div>
+              {trending.map(([tag, count]) => (
+                <div key={tag} className="trend-tag"
+                  onClick={() => { setFilter(tag); setTab('feed') }}>
+                  <span className="trend-tag-n">{tag}</span>
+                  <span className="trend-tag-c">{count} project{count!==1?'s':''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Suggested builders */}
+          {profiles.length > 0 && (
+            <div className="side-card rise" style={{ animationDelay: '.15s' }}>
+              <div className="side-label">Builders to follow</div>
+              {profiles.slice(0, 5).map(p => {
+                const name = p.full_name || p.username
+                return (
+                  <div key={p.id} className="builder-row">
+                    <Link to={`/profile/${p.username}`} className="br-av">
+                      {p.avatar_url?<img src={p.avatar_url} alt=""/>:initials(name)}
+                    </Link>
+                    <div style={{ flex:1,minWidth:0 }}>
+                      <Link to={`/profile/${p.username}`} className="br-name">{name}</Link>
+                      <div className="br-handle">@{p.username}</div>
+                    </div>
+                    <Link to={`/profile/${p.username}`} className="br-follow">Follow</Link>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Share CTA */}
+          <div className="side-card rise" style={{ animationDelay: '.2s', background: c.oBg, border: `1px solid rgba(255,107,53,0.2)` }}>
+            <div style={{ fontSize: '.85rem', fontWeight: 700, color: c.o, marginBottom: '.5rem' }}>
+              Share what you're building
+            </div>
+            <p style={{ fontSize: '.8rem', color: c.ink2, lineHeight: 1.65, marginBottom: '1rem' }}>
+              The problem you solved is more valuable than any CV. Show your work.
+            </p>
+            <Link to="/project/new" className="post-empty-btn" style={{ width:'100%',justifyContent:'center' }}>
+              + Add a project
+            </Link>
+          </div>
+        </aside>
       </div>
     </div>
   )
