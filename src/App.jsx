@@ -2,18 +2,11 @@ import React, { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { supabase, getUser } from './lib/supabase.js'
 import Nav from './components/Nav.jsx'
-import Landing from './pages/Landing.jsx'
 import Auth from './pages/Auth.jsx'
 import Dashboard from './pages/Dashboard.jsx'
-import Discover from './pages/Discover.jsx'
-import ProfileView from './pages/ProfileView.jsx'
-import ProfileEdit from './pages/ProfileEdit.jsx'
-import ProjectNew from './pages/ProjectNew.jsx'
-import ProjectDetail from './pages/ProjectDetail.jsx'
 import DocReader from './pages/DocReader.jsx'
 
-// Routes where the app nav bar should be hidden
-const NO_NAV = ['/', '/auth']
+const NO_NAV = ['/auth']
 
 function Shell({ user, setUser }) {
   const location = useLocation()
@@ -21,26 +14,17 @@ function Shell({ user, setUser }) {
 
   return (
     <>
-      {showNav && <Nav user={user} onLogout={() => setUser(null)} />}
+      {showNav && <Nav user={user} />}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <Routes>
-          {/* Public — always available */}
-          <Route path="/" element={<Landing />} />
           <Route
             path="/auth"
             element={user ? <Navigate to="/home" replace /> : <Auth onAuth={() => getUser().then(setUser)} />}
           />
-
-          {/* Protected */}
           {user ? (
             <>
               <Route path="/home" element={<Dashboard user={user} />} />
-              <Route path="/discover" element={<Discover user={user} />} />
               <Route path="/reader" element={<DocReader />} />
-              <Route path="/profile/:username" element={<ProfileView user={user} />} />
-              <Route path="/settings" element={<ProfileEdit user={user} />} />
-              <Route path="/project/new" element={<ProjectNew user={user} />} />
-              <Route path="/project/:id" element={<ProjectDetail user={user} />} />
               <Route path="*" element={<Navigate to="/home" replace />} />
             </>
           ) : (
@@ -68,24 +52,18 @@ export default function App() {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', background: '#FFFFFF',
+        minHeight: '100vh', background: 'var(--bg)',
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
-            width: 42, height: 42, borderRadius: '50%',
-            border: '3px solid #FFF1EC',
-            borderTop: '3px solid #FF6B35',
-            animation: 'spin .9s linear infinite',
-            margin: '0 auto 1rem',
-          }} />
-          <p style={{
-            color: '#8888A8', fontSize: '.78rem', fontWeight: 600,
-            fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '.12em',
-          }}>LOADING</p>
-          <style>{`
-            @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-            @keyframes spin { to { transform: rotate(360deg) } }
-          `}</style>
+            width: 44, height: 44, borderRadius: 12,
+            background: 'linear-gradient(135deg, var(--purple), var(--cyan))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Orbitron', sans-serif", fontSize: '.9rem', fontWeight: 700, color: '#fff',
+            animation: 'pulse 1.5s ease-in-out infinite', margin: '0 auto 1rem',
+          }}>Sw</div>
+          <p style={{ color: 'var(--muted)', fontSize: '.78rem', fontWeight: 600, letterSpacing: '.12em' }}>LOADING</p>
+          <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.92)} }`}</style>
         </div>
       </div>
     )
