@@ -10,6 +10,7 @@ import ProfileView from './pages/ProfileView.jsx'
 import ProfileEdit from './pages/ProfileEdit.jsx'
 import ProjectNew from './pages/ProjectNew.jsx'
 import ProjectDetail from './pages/ProjectDetail.jsx'
+import DocReader from './pages/DocReader.jsx'
 
 // Routes where the app nav bar should be hidden
 const NO_NAV = ['/', '/auth']
@@ -35,6 +36,7 @@ function Shell({ user, setUser }) {
             <>
               <Route path="/home" element={<Dashboard user={user} />} />
               <Route path="/discover" element={<Discover user={user} />} />
+              <Route path="/reader" element={<DocReader />} />
               <Route path="/profile/:username" element={<ProfileView user={user} />} />
               <Route path="/settings" element={<ProfileEdit user={user} />} />
               <Route path="/project/new" element={<ProjectNew user={user} />} />
